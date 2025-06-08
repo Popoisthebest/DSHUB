@@ -6,7 +6,8 @@ function Footer() {
     <footer
       style={{
         backgroundColor: "white",
-        padding: "3rem 2rem",
+        padding: "2rem",
+        marginTop: "auto",
         boxShadow: "0 -2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -14,60 +15,50 @@ function Footer() {
         style={{
           maxWidth: "1200px",
           margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "2rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
         }}
       >
         <div>
-          <h3 style={{ marginBottom: "1rem", color: "var(--secondary-color)" }}>
+          <h3 style={{ marginBottom: "0.5rem", color: "var(--primary-color)" }}>
             DAESHILL
           </h3>
-          <p style={{ color: "var(--text-color)" }}>
-            동아리 활동을 위한 공간 예약 서비스
+          <p style={{ color: "var(--text-color-light)", fontSize: "0.9rem" }}>
+            대전대신고등학교 공간 예약 시스템
           </p>
         </div>
-        <div>
-          <h3 style={{ marginBottom: "1rem", color: "var(--secondary-color)" }}>
-            제작자
-          </h3>
-          <p style={{ color: "var(--text-color)" }}>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ color: "var(--text-color-light)", fontSize: "0.9rem" }}>
+            © 2025 A.C.T.(KE). All rights reserved.
+          </p>
+          <p style={{ color: "var(--text-color-light)", fontSize: "0.8rem" }}>
+            Developed by{" "}
             <a
               href="https://github.com/Popoisthebest"
               target="_blank"
               rel="noopener noreferrer"
             >
-              #Popoisthebest
+              Popoisthebest
             </a>
-          </p>
-          <p style={{ color: "var(--text-color)" }}>
+            ,
             <a
               href="https://github.com/CloudR1ng"
               target="_blank"
               rel="noopener noreferrer"
             >
-              #CloudR1ng
+              CloudR1ng
             </a>
-          </p>
-          <p style={{ color: "var(--text-color)" }}>
+            ,
             <a
               href="https://github.com/UntameDuck"
               target="_blank"
               rel="noopener noreferrer"
             >
-              #UntameDuck
+              UntameDuck
             </a>
-          </p>
-        </div>
-        <div>
-          <h3 style={{ marginBottom: "1rem", color: "var(--secondary-color)" }}>
-            예약 시간
-          </h3>
-          <p style={{ color: "var(--text-color)" }}>
-            예약 간격은 한 주 단위이며,
-          </p>
-          <p style={{ color: "var(--text-color)" }}>
-            취소는 당일 오전 8시까지 가능합니다.
           </p>
         </div>
       </div>

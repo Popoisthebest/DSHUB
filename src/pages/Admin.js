@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { getAllReservations, deleteReservation } from "../firebase/db";
+import { listenToAllReservations, deleteReservation } from "../firebase/db";
 import { formatDateToYYYYMMDD, formatDate } from "../utils/dateUtils";
 import "../styles/common.css";
 
@@ -21,48 +21,46 @@ function Admin() {
       navigate("/");
       return;
     }
-    loadReservations();
+
+    // 실시간 리스너 설정
+    const startDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
+    const endDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0
+    );
+
+    const startOfWeekStr = formatDateToYYYYMMDD(startDate);
+    const endOfWeekStr = formatDateToYYYYMMDD(endDate);
+
+    const unsubscribe = listenToAllReservations(
+      (reservationsData) => {
+        // 날짜별로 예약 데이터 그룹화
+        const groupedData = reservationsData.reduce((acc, reservation) => {
+          const dateKey = reservation.date;
+          if (!acc[dateKey]) {
+            acc[dateKey] = [];
+          }
+          if (filterStatus === "all" || reservation.status === filterStatus) {
+            acc[dateKey].push(reservation);
+          }
+          return acc;
+        }, {});
+
+        setReservations(groupedData);
+        setLoading(false);
+      },
+      startOfWeekStr,
+      endOfWeekStr
+    );
+
+    // 컴포넌트 언마운트 시 리스너 해제
+    return () => unsubscribe();
   }, [user, currentDate, filterStatus]);
-
-  const loadReservations = async () => {
-    try {
-      setLoading(true);
-      const startDate = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        1
-      );
-      const endDate = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        0
-      );
-
-      const data = await getAllReservations(
-        formatDateToYYYYMMDD(startDate),
-        formatDateToYYYYMMDD(endDate)
-      );
-
-      // 날짜별로 예약 데이터 그룹화
-      const groupedData = data.reduce((acc, reservation) => {
-        const dateKey = reservation.date;
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
-        }
-        if (filterStatus === "all" || reservation.status === filterStatus) {
-          acc[dateKey].push(reservation);
-        }
-        return acc;
-      }, {});
-
-      setReservations(groupedData);
-    } catch (err) {
-      setError("예약 목록을 불러오는 중 오류가 발생했습니다.");
-      console.error("예약 목록 로딩 오류:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleOpenDetailModal = (reservation) => {
     setSelectedReservation(reservation);
@@ -92,7 +90,6 @@ function Admin() {
     if (window.confirm("이 예약을 취소하시겠습니까?")) {
       try {
         await deleteReservation(reservationId);
-        await loadReservations();
         handleCloseDetailModal();
       } catch (error) {
         setError("예약 취소 중 오류가 발생했습니다.");
