@@ -157,10 +157,16 @@ const ROOMS = {
 
 // 예약 가능한 시간대 (요일별 제한을 위해 hour, minute 정보 추가)
 const TIME_SLOTS = [
-  { id: "lunch", name: "점심시간", time: "12:00 - 13:00", hour: 12, minute: 0 },
-  { id: "cip1", name: "CIP1", time: "13:00 - 15:00", hour: 13, minute: 0 },
-  { id: "cip2", name: "CIP2", time: "15:00 - 17:00", hour: 15, minute: 0 },
-  { id: "cip3", name: "CIP3", time: "17:00 - 19:00", hour: 17, minute: 0 },
+  {
+    id: "lunch",
+    name: "점심시간",
+    time: "12:40 - 13:30",
+    hour: 12,
+    minute: 40,
+  },
+  { id: "cip1", name: "CIP1", time: "16:50 - 17:40", hour: 16, minute: 50 },
+  { id: "cip2", name: "CIP2", time: "18:30 - 20:00", hour: 18, minute: 30 },
+  { id: "cip3", name: "CIP3", time: "20:10 - 21:00", hour: 20, minute: 10 },
 ];
 
 function Reserve() {
@@ -708,7 +714,7 @@ function Reserve() {
           <label
             style={{
               display: "block",
-              marginBottom: "0.5rem",
+              marginTop: "2rem",
               fontWeight: "500",
             }}
           >
