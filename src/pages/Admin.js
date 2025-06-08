@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { getAllReservations, deleteReservation } from "../firebase/db";
+import { formatDateToYYYYMMDD, formatDate } from "../utils/dateUtils";
 import "../styles/common.css";
 
 function Admin() {
@@ -38,8 +39,8 @@ function Admin() {
       );
 
       const data = await getAllReservations(
-        startDate.toISOString().split("T")[0],
-        endDate.toISOString().split("T")[0]
+        formatDateToYYYYMMDD(startDate),
+        formatDateToYYYYMMDD(endDate)
       );
 
       // 날짜별로 예약 데이터 그룹화
@@ -73,27 +74,31 @@ function Admin() {
     setIsDetailModalOpen(false);
   };
 
-  const handleConfirmCancel = async () => {
-    if (window.confirm("이 예약을 취소하시겠습니까?")) {
-      try {
-        await deleteReservation(selectedReservation.id);
-        await loadReservations();
-        handleCloseDetailModal();
-      } catch (err) {
-        setError("예약 취소 중 오류가 발생했습니다.");
-        console.error("예약 취소 오류:", err);
-      }
-    }
+  const getStartOfWeek = () => {
+    const date = new Date(currentDate);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "long",
-    });
+  const getEndOfWeek = () => {
+    const date = new Date(currentDate);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? 0 : 7);
+    return new Date(date.setDate(diff));
+  };
+
+  const handleCancel = async (reservationId) => {
+    if (window.confirm("이 예약을 취소하시겠습니까?")) {
+      try {
+        await deleteReservation(reservationId);
+        await loadReservations();
+        handleCloseDetailModal();
+      } catch (error) {
+        setError("예약 취소 중 오류가 발생했습니다.");
+        console.error("예약 취소 오류:", error);
+      }
+    }
   };
 
   const getDaysInMonth = (date) => {
@@ -154,7 +159,7 @@ function Admin() {
             currentDate.getMonth(),
             dayCount
           );
-          const dateKey = date.toISOString().split("T")[0];
+          const dateKey = formatDateToYYYYMMDD(date);
           const dayReservations = reservations[dateKey] || [];
 
           week.push(
@@ -369,6 +374,13 @@ function Admin() {
           <div style={{ textAlign: "center", padding: "2rem" }}>
             예약 목록 로딩 중...
           </div>
+        ) : reservations.length === 0 &&
+          Object.keys(reservations).every(
+            (key) => reservations[key].length === 0
+          ) ? (
+          <div style={{ textAlign: "center", padding: "2rem" }}>
+            해당 달의 예약이 없습니다.
+          </div>
         ) : (
           renderCalendar()
         )}
@@ -433,7 +445,8 @@ function Admin() {
                 {selectedReservation.floor} - {selectedReservation.room}
               </p>
               <p>
-                <strong>날짜:</strong> {formatDate(selectedReservation.date)}
+                <strong>날짜:</strong>{" "}
+                {formatDate(new Date(selectedReservation.date))}
               </p>
               <p>
                 <strong>시간:</strong>{" "}
@@ -473,7 +486,7 @@ function Admin() {
             {selectedReservation.status === "active" && (
               <div style={{ textAlign: "right", marginTop: "2rem" }}>
                 <button
-                  onClick={handleConfirmCancel}
+                  onClick={() => handleCancel(selectedReservation.id)}
                   style={{
                     padding: "0.7rem 1.5rem",
                     backgroundColor: "#dc3545",

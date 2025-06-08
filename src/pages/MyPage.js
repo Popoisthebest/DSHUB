@@ -50,6 +50,16 @@ function MyPage() {
   };
 
   const handleCancel = async (reservationId) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const cutoffTime = new Date(today);
+    cutoffTime.setHours(8, 0, 0, 0);
+
+    if (now > cutoffTime) {
+      setReservationsError("오전 8시 이후에는 관리자에게 문의해주세요.");
+      return;
+    }
+
     if (window.confirm("이 예약을 취소하시겠습니까?")) {
       try {
         await deleteReservation(reservationId);
@@ -214,9 +224,18 @@ function MyPage() {
                     border: "none",
                     borderRadius: "4px",
                     cursor: "pointer",
+                    opacity:
+                      new Date() > new Date(new Date().setHours(8, 0, 0, 0))
+                        ? 0.5
+                        : 1,
                   }}
+                  disabled={
+                    new Date() > new Date(new Date().setHours(8, 0, 0, 0))
+                  }
                 >
-                  예약 취소
+                  {new Date() > new Date(new Date().setHours(8, 0, 0, 0))
+                    ? "취소 불가 (8시 이후)"
+                    : "예약 취소"}
                 </button>
               </div>
             ))}

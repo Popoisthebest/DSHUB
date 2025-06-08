@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "./config";
 
@@ -46,80 +47,83 @@ export const deleteReservation = async (reservationId) => {
   }
 };
 
-// 모든 예약 조회 (지정된 주 또는 현재 주의 모든 예약)
-export const getAllReservations = async (
-  startOfWeekStr = null,
-  endOfWeekStr = null
+// 모든 예약 조회 (지정된 주 또는 현재 주의 모든 예약) - 스냅샷 리스너
+export const listenToAllReservations = (
+  callback,
+  startOfWeekStr,
+  endOfWeekStr
+) => {
+  let q = query(
+    collection(db, "reservations"),
+    where("date", ">=", startOfWeekStr),
+    where("date", "<=", endOfWeekStr),
+    orderBy("date", "asc"), // 날짜 기준 오름차순 정렬
+    orderBy("time", "asc") // 시간 기준 오름차순 정렬
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const reservationsData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      callback(reservationsData);
+    },
+    (error) => {
+      console.error("Error listening to all reservations:", error);
+      // 에러 처리 로직 추가 가능
+    }
+  );
+
+  return unsubscribe;
+};
+
+// 특정 사용자 예약 조회 - 스냅샷 리스너
+export const listenToUserReservations = (callback, userId) => {
+  const q = query(
+    collection(db, "reservations"),
+    where("studentId", "==", userId),
+    orderBy("createdAt", "desc")
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const reservationsData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      callback(reservationsData);
+    },
+    (error) => {
+      console.error("Error listening to user reservations:", error);
+    }
+  );
+
+  return unsubscribe;
+};
+
+// 특정 날짜, 방, 시간의 예약 조회 (실시간 리스너는 아님, 일회성 조회)
+export const getReservationsByDate = async (
+  date,
+  roomName = null,
+  timeId = null
 ) => {
   try {
-    const formatDateToYYYYMMDD = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-
-    let currentStartOfWeekStr = startOfWeekStr;
-    let currentEndOfWeekStr = endOfWeekStr;
-
-    if (!currentStartOfWeekStr || !currentEndOfWeekStr) {
-      const today = new Date();
-      const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - dayOfWeek); // 이번 주 일요일
-      startDate.setHours(0, 0, 0, 0);
-
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() + (6 - dayOfWeek)); // 이번 주 토요일
-      endDate.setHours(23, 59, 59, 999);
-
-      currentStartOfWeekStr = formatDateToYYYYMMDD(startDate);
-      currentEndOfWeekStr = formatDateToYYYYMMDD(endDate);
-    }
-
-    const q = query(
-      collection(db, "reservations"),
-      where("date", ">=", currentStartOfWeekStr),
-      where("date", "<=", currentEndOfWeekStr),
-      orderBy("date", "asc"), // 날짜 기준 오름차순 정렬
-      orderBy("time", "asc") // 시간 기준 오름차순 정렬
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-  } catch (error) {
-    throw error;
-  }
-};
-
-// 특정 사용자 예약 조회
-export const getUserReservations = async (userId) => {
-  try {
-    const q = query(
-      collection(db, "reservations"),
-      where("studentId", "==", userId),
-      orderBy("createdAt", "desc")
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-  } catch (error) {
-    throw error;
-  }
-};
-
-// 특정 날짜의 예약 조회
-export const getReservationsByDate = async (date) => {
-  try {
-    const q = query(
+    let q = query(
       collection(db, "reservations"),
       where("date", "==", date),
       orderBy("time", "asc")
     );
+
+    if (roomName) {
+      q = query(q, where("room", "==", roomName));
+    }
+    if (timeId) {
+      q = query(q, where("time", "==", timeId));
+    }
+
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
@@ -143,6 +147,46 @@ export const getReservation = async (reservationId) => {
     }
     return null;
   } catch (error) {
+    throw error;
+  }
+};
+
+// 모든 예약 데이터 가져오기
+export const getAllReservations = async (startDate, endDate) => {
+  try {
+    const reservationsRef = collection(db, "reservations");
+    const q = query(
+      reservationsRef,
+      where("date", ">=", startDate),
+      where("date", "<=", endDate)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error("Error getting all reservations:", error);
+    throw error;
+  }
+};
+
+// 특정 사용자의 예약 데이터 가져오기
+export const getUserReservations = async (studentId) => {
+  try {
+    const reservationsRef = collection(db, "reservations");
+    const q = query(
+      reservationsRef,
+      where("studentId", "==", studentId),
+      where("status", "==", "active")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error("Error getting user reservations:", error);
     throw error;
   }
 };
