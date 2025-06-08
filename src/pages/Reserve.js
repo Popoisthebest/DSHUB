@@ -284,7 +284,25 @@ function Reserve() {
     setError("");
 
     try {
-      // try 블록 시작
+      // 1. 예약 직전, 해당 시간대가 이미 예약되었는지 다시 한번 확인
+      const existingReservations = await getReservationsByDate(
+        formatDateToYYYYMMDD(selectedDate),
+        selectedRoom.name,
+        timeSlot.id
+      );
+
+      const isAlreadyBooked = existingReservations.some(
+        (res) => res.status === "active"
+      );
+
+      if (isAlreadyBooked) {
+        setError(
+          "선택하신 시간은 이미 예약되었습니다. 다른 시간을 선택해주세요."
+        );
+        setLoading(false);
+        return;
+      }
+
       const reservationData = {
         studentId: user.studentId,
         studentName: user.name,
@@ -673,20 +691,28 @@ function Reserve() {
                   style={{
                     padding: "1.5rem",
                     border: `1px solid ${
-                      isDisabled ? "#e0e0e0" : "var(--border-color)"
+                      isReserved
+                        ? "#dc3545"
+                        : isDisabledByTime
+                        ? "#e0e0e0"
+                        : "var(--border-color)"
                     }`,
                     borderRadius: "8px",
                     cursor: loading || isDisabled ? "not-allowed" : "pointer",
                     transition: "all 0.3s ease",
-                    backgroundColor: isDisabled ? "#f5f5f5" : "white",
+                    backgroundColor: isReserved
+                      ? "#ffebee"
+                      : isDisabledByTime
+                      ? "#f5f5f5"
+                      : "white",
                     textAlign: "center",
                     opacity: loading || isDisabled ? 0.7 : 1,
                     borderColor:
-                      selectedTime?.id === slot.id
+                      selectedTime?.id === slot.id && !isReserved
                         ? "var(--primary-color)"
                         : undefined,
                     boxShadow:
-                      selectedTime?.id === slot.id
+                      selectedTime?.id === slot.id && !isReserved
                         ? "0 0 0 2px var(--primary-color)"
                         : undefined,
                   }}
