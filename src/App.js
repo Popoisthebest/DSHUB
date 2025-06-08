@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
+  useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Header from "./components/Header";
@@ -13,6 +14,7 @@ import Reserve from "./pages/Reserve";
 import Reservations from "./pages/Reservations";
 import MyPage from "./pages/MyPage";
 import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 import "./styles/common.css";
 
 // 보호된 라우트 컴포넌트
@@ -31,6 +33,20 @@ function ProtectedRoute({ children }) {
 
   return children;
 }
+
+// 관리자 전용 라우트 컴포넌트
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user || !user.isAdmin) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  return user?.isAdmin ? children : null;
+};
 
 function AppContent() {
   return (
@@ -64,6 +80,14 @@ function AppContent() {
               <ProtectedRoute>
                 <MyPage />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
             }
           />
         </Routes>

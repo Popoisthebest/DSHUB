@@ -121,6 +121,20 @@ function Header() {
                 마이페이지
               </Link>
             </li>
+            {user?.isAdmin && (
+              <li>
+                <Link
+                  to="/admin"
+                  style={{
+                    textDecoration: "none",
+                    color: "var(--primary-color)",
+                    fontWeight: "500",
+                  }}
+                >
+                  관리자
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 
@@ -130,38 +144,62 @@ function Header() {
             <button
               onClick={handleLogout}
               style={{
-                background: "none",
+                padding: "0.6rem 1.2rem",
+                backgroundColor: "#dc3545",
+                color: "white",
                 border: "none",
-                color: "var(--text-color)",
-                fontWeight: "500",
+                borderRadius: "6px",
                 cursor: "pointer",
-                padding: "0.5rem 1rem",
-                borderRadius: "4px",
-                transition: "background-color 0.3s ease",
+                fontSize: "0.95rem",
+                fontWeight: "500",
+                transition: "all 0.3s ease",
+                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
                 ":hover": {
-                  backgroundColor: "var(--hover-color)",
+                  backgroundColor: "#c82333",
+                  transform: "translateY(-1px)",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                },
+                ":active": {
+                  transform: "translateY(0)",
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                 },
               }}
             >
-              로그아웃
+              <span>로그아웃</span>
             </button>
           ) : (
-            <Link
-              to="/login"
+            <button
+              onClick={() => navigate("/login")}
               style={{
-                textDecoration: "none",
-                color: "var(--text-color)",
+                padding: "0.6rem 1.2rem",
+                backgroundColor: "var(--primary-color)",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
                 fontWeight: "500",
-                padding: "0.5rem 1rem",
-                borderRadius: "4px",
-                transition: "background-color 0.3s ease",
+                transition: "all 0.3s ease",
+                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
                 ":hover": {
-                  backgroundColor: "var(--hover-color)",
+                  backgroundColor: "var(--primary-color-dark)",
+                  transform: "translateY(-1px)",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                },
+                ":active": {
+                  transform: "translateY(0)",
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                 },
               }}
             >
-              로그인
-            </Link>
+              <span>로그인</span>
+            </button>
           )}
         </div>
       </div>
