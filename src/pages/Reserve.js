@@ -744,7 +744,7 @@ function Reserve() {
                     padding: "1.5rem",
                     border: `1px solid ${
                       isReserved
-                        ? "#dc3545"
+                        ? "#d0d0d0" // 예약 완료 시 테두리 색상 변경
                         : isDisabledByTime
                         ? "#e0e0e0"
                         : "var(--border-color)"
@@ -753,7 +753,7 @@ function Reserve() {
                     cursor: loading || isDisabled ? "not-allowed" : "pointer",
                     transition: "all 0.3s ease",
                     backgroundColor: isReserved
-                      ? "#ffebee"
+                      ? "#f0f0f0" // 예약 완료 시 배경색 변경
                       : isDisabledByTime
                       ? "#f5f5f5"
                       : "white",
@@ -769,12 +769,25 @@ function Reserve() {
                         : undefined,
                   }}
                 >
-                  <h4 style={{ marginBottom: "0.5rem" }}>{slot.name}</h4>
-                  <p style={{ color: "var(--text-color)" }}>{slot.time}</p>
+                  <h4
+                    style={{
+                      marginBottom: "0.5rem",
+                      color: isDisabled ? "#888" : "inherit", // 비활성화 시 텍스트 색상 변경
+                    }}
+                  >
+                    {slot.name}
+                  </h4>
+                  <p
+                    style={{
+                      color: isDisabled ? "#888" : "var(--text-color)", // 비활성화 시 텍스트 색상 변경
+                    }}
+                  >
+                    {slot.time}
+                  </p>
                   {isReserved && (
                     <p
                       style={{
-                        color: "#dc3545",
+                        color: "#dc3545", // 예약 완료 텍스트는 빨간색 유지
                         fontSize: "0.85rem",
                         marginTop: "0.5rem",
                         fontWeight: "500",

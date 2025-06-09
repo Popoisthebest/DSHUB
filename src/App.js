@@ -55,6 +55,50 @@ const AdminRoute = ({ children }) => {
 };
 
 function AppContent() {
+  useEffect(() => {
+    // 개발자 도구 단축키 차단
+    const handleKeyDown = (event) => {
+      if (
+        event.keyCode === 123 ||
+        (event.ctrlKey && event.shiftKey && event.keyCode === 73)
+      ) {
+        event.preventDefault();
+        alert("개발자 도구 사용이 금지되어 있습니다.");
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    // 개발자 도구 열림 감지
+    const devToolsDetector = () => {
+      const callback = () => {
+        alert("개발자 도구 사용이 금지되어 있습니다.");
+      };
+
+      const checkStatus = () => {
+        const startTime = performance.now();
+        // eslint-disable-next-line no-debugger
+        debugger;
+        const endTime = performance.now();
+
+        if (endTime - startTime > 100) {
+          callback();
+        }
+      };
+
+      const intervalId = setInterval(checkStatus, 1000);
+      return intervalId;
+    };
+
+    const interval = devToolsDetector();
+
+    // 클린업 함수: 컴포넌트 언마운트 시 이벤트 리스너 및 인터벌 제거
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      clearInterval(interval);
+    };
+  }, []); // 빈 배열: 컴포넌트 마운트 시 한 번만 실행
+
   return (
     <div
       style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
