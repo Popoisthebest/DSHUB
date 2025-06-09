@@ -229,7 +229,7 @@ function Admin() {
                         color: "var(--text-color-light)",
                       }}
                     >
-                      {reservation.studentName}
+                      {reservation.studentName} ({reservation.studentId})
                     </div>
                   </div>
                 ))}
@@ -434,8 +434,8 @@ function Admin() {
             </h3>
             <div style={{ lineHeight: "1.8" }}>
               <p>
-                <strong>예약자:</strong> {selectedReservation.studentName}{" "}
-                (학번: {selectedReservation.studentId})
+                <strong>예약자:</strong> {selectedReservation.studentName} (
+                {selectedReservation.studentId})
               </p>
               <p>
                 <strong>장소:</strong> {selectedReservation.wing} -{" "}

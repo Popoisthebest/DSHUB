@@ -292,7 +292,7 @@ function Reservations() {
                               color: "var(--text-color-light)",
                             }}
                           >
-                            {getUserRoleById(reservation.studentId) === "admin"
+                            {user?.role === "admin"
                               ? reservation.studentName
                               : maskName(reservation.studentName)}
                           </p>
@@ -368,10 +368,15 @@ function Reservations() {
             <div style={{ lineHeight: "1.8" }}>
               <p>
                 <strong>예약자:</strong>{" "}
-                {getUserRoleById(selectedReservation.studentId) === "admin"
+                {user?.role === "admin"
                   ? selectedReservation.studentName
                   : maskName(selectedReservation.studentName)}
               </p>
+              {user?.role === "admin" && selectedReservation.studentId && (
+                <p>
+                  <strong>학번:</strong> {selectedReservation.studentId}
+                </p>
+              )}
               <p>
                 <strong>장소:</strong> {selectedReservation.room}
               </p>
