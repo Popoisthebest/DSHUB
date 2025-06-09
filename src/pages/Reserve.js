@@ -871,8 +871,24 @@ function Reserve() {
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
+      <h2 style={{ marginBottom: "1.5rem" }}>공간 예약하기</h2>
+
+      <div
+        style={{
+          backgroundColor: "#fff3cd", // 경고 색상 배경
+          color: "#856404", // 경고 색상 텍스트
+          padding: "1rem",
+          borderRadius: "8px",
+          marginBottom: "1.5rem",
+          border: "1px solid #ffeeba",
+          fontSize: "0.95rem",
+        }}
+      >
+        <strong>안내:</strong> 취소는 당일 오전 8시까지 가능합니다. 그 이후에는
+        관리자에게 문의해주세요.
+      </div>
+
       <div style={{ marginBottom: "2rem" }}>
-        <h2 style={{ marginBottom: "1rem" }}>공간 예약</h2>
         <div
           style={{
             display: "flex",
