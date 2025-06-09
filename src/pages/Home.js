@@ -20,7 +20,7 @@ function Home() {
           color: "var(--text-color)",
         }}
       >
-        동아리 활동을 위한 공간 예약 서비스에 오신 것을 환영합니다.
+        활동을 위한 공간 예약 서비스에 오신 것을 환영합니다.
       </p>
       <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
         <button

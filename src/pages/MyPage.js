@@ -114,9 +114,11 @@ function MyPage() {
           내 정보
         </h3>
         <div style={{ display: "grid", gap: "1rem", marginBottom: "2rem" }}>
-          <p style={{ fontSize: "1.1rem", color: "var(--text-color)" }}>
-            <strong>학번:</strong> {formatStudentId(user.studentId)}
-          </p>
+          {user?.role !== "admin" && (
+            <p style={{ fontSize: "1.1rem", color: "var(--text-color)" }}>
+              <strong>학번:</strong> {formatStudentId(user.studentId)}
+            </p>
+          )}
           <p style={{ fontSize: "1.1rem", color: "var(--text-color)" }}>
             <strong>이름:</strong> {user.name}
           </p>
