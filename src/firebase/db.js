@@ -190,3 +190,42 @@ export const getUserReservations = async (studentId) => {
     throw error;
   }
 };
+
+// 공지사항 생성
+export const createNotice = async (noticeData) => {
+  try {
+    const docRef = await addDoc(collection(db, "notices"), {
+      ...noticeData,
+      createdAt: new Date(),
+    });
+    return docRef.id;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 공지사항 삭제
+export const deleteNotice = async (noticeId) => {
+  try {
+    const noticeRef = doc(db, "notices", noticeId);
+    await deleteDoc(noticeRef);
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 모든 공지사항 조회
+export const getAllNotices = async () => {
+  try {
+    const noticesRef = collection(db, "notices");
+    const q = query(noticesRef, orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error("Error getting all notices:", error);
+    throw error;
+  }
+};
