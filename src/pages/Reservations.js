@@ -16,6 +16,7 @@ const maskName = (name) => {
 };
 
 function Reservations() {
+  const { user, getUserRoleById } = useAuth(); // getUserRoleById 함수 가져오기
   const [reservations, setReservations] = useState({}); // 날짜별로 그룹화된 예약을 저장
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -291,7 +292,9 @@ function Reservations() {
                               color: "var(--text-color-light)",
                             }}
                           >
-                            {maskName(reservation.studentName)}
+                            {getUserRoleById(reservation.studentId) === "admin"
+                              ? reservation.studentName
+                              : maskName(reservation.studentName)}
                           </p>
                           <p
                             style={{
@@ -365,10 +368,9 @@ function Reservations() {
             <div style={{ lineHeight: "1.8" }}>
               <p>
                 <strong>예약자:</strong>{" "}
-                {maskName(selectedReservation.studentName)}
-              </p>
-              <p>
-                <strong>학번:</strong> {selectedReservation.studentId}
+                {getUserRoleById(selectedReservation.studentId) === "admin"
+                  ? selectedReservation.studentName
+                  : maskName(selectedReservation.studentName)}
               </p>
               <p>
                 <strong>장소:</strong> {selectedReservation.room}

@@ -374,6 +374,16 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const getUserRoleById = (id) => {
+    if (id === "admin" && ADMIN[id]) {
+      return ADMIN[id].role;
+    }
+    if (STUDENTS[id]) {
+      return STUDENTS[id].role;
+    }
+    return null; // 또는 'unknown' 또는 기본 역할
+  };
+
   const login = (studentId, password) => {
     return new Promise((resolve, reject) => {
       // 관리자 로그인 체크
@@ -421,6 +431,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     loading,
+    getUserRoleById,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
