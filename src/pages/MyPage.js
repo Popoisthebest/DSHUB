@@ -208,7 +208,7 @@ function MyPage() {
                       : reservation.timeRange}
                   </p>
                   <p style={{ color: "var(--text-color)", fontSize: "0.9rem" }}>
-                    예약자: {maskName(reservation.studentName)}
+                    예약자: {reservation.studentName}
                   </p>
                   <p style={{ color: "var(--text-color)", fontSize: "0.9rem" }}>
                     예약일시:{" "}

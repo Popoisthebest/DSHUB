@@ -364,52 +364,28 @@ function Reservations() {
             </h3>
             <div style={{ lineHeight: "1.8" }}>
               <p>
-                <strong>예약자:</strong> {selectedReservation.studentName}
+                <strong>예약자:</strong>{" "}
+                {maskName(selectedReservation.studentName)}
               </p>
               <p>
                 <strong>학번:</strong> {selectedReservation.studentId}
               </p>
               <p>
-                <strong>장소:</strong> {selectedReservation.wing} -{" "}
-                {selectedReservation.floor} - {selectedReservation.room}
+                <strong>장소:</strong> {selectedReservation.room}
               </p>
               <p>
-                <strong>날짜:</strong>{" "}
-                {formatDate(new Date(selectedReservation.date))}
+                <strong>날짜:</strong> {selectedReservation.date}
               </p>
               <p>
-                <strong>시간:</strong>{" "}
-                {selectedReservation.time === "lunch"
-                  ? "점심시간"
-                  : selectedReservation.time === "cip1"
-                  ? "CIP1"
-                  : selectedReservation.time === "cip2"
-                  ? "CIP2"
-                  : selectedReservation.time === "cip3"
-                  ? "CIP3"
-                  : selectedReservation.timeRange}
+                <strong>시간:</strong> {selectedReservation.timeRange}
               </p>
+              {selectedReservation.club && (
+                <p>
+                  <strong>동아리:</strong> {selectedReservation.club}
+                </p>
+              )}
               <p>
                 <strong>이용 사유:</strong> {selectedReservation.reason}
-              </p>
-              <p>
-                <strong>상태:</strong>{" "}
-                <span
-                  style={{
-                    padding: "0.25rem 0.5rem",
-                    borderRadius: "4px",
-                    backgroundColor:
-                      selectedReservation.status === "active"
-                        ? "#e8f5e9"
-                        : "#ffebee",
-                    color:
-                      selectedReservation.status === "active"
-                        ? "#2e7d32"
-                        : "#c62828",
-                  }}
-                >
-                  {selectedReservation.status === "active" ? "활성" : "취소됨"}
-                </span>
               </p>
             </div>
           </div>
