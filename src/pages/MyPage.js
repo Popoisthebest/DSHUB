@@ -31,8 +31,26 @@ function MyPage() {
   const [reservationsError, setReservationsError] = useState("");
 
   useEffect(() => {
-    if (user && user.studentId) {
-      loadUserReservations(user.studentId);
+    if (user) {
+      if (user.role === "admin") {
+        // 관리자는 개인 예약 현황을 볼 필요가 없으므로 로딩 상태를 즉시 종료합니다.
+        setLoadingReservations(false);
+        setUserReservations([]); // 빈 배열로 설정하여 "예약된 내 공간이 없습니다." 메시지가 보이도록
+        setReservationsError(""); // 에러 메시지 초기화
+      } else if (user.studentId) {
+        // 학생 사용자는 학번을 기준으로 예약 현황을 불러옵니다.
+        loadUserReservations(user.studentId);
+      } else {
+        // 사용자 정보는 있지만 학번이 없는 경우 (예: 프로필 미완성 학생)
+        setLoadingReservations(false);
+        setUserReservations([]);
+        setReservationsError("예약 정보를 불러올 수 없습니다.");
+      }
+    } else {
+      // user 객체가 없는 경우 (로그아웃 상태 등)
+      setLoadingReservations(false);
+      setUserReservations([]);
+      setReservationsError("로그인 정보가 없습니다.");
     }
   }, [user]);
 

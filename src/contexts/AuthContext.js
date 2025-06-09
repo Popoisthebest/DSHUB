@@ -9,7 +9,7 @@ const AuthContext = createContext(null);
 const TEACHER_ACCOUNT = {
   id: "admin",
   password: "1234",
-  name: "선생님",
+  name: "관리자",
   role: "admin",
 };
 
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
             role: userRole,
             isAdmin: userRole === "admin",
             studentId: userProfile?.studentId || null,
-            name: userProfile?.name || null,
+            name: userRole === "admin" ? "관리자" : userProfile?.name || null,
             profileComplete: !!(
               userProfile &&
               userProfile.studentId &&
