@@ -55,7 +55,8 @@ function MyPage() {
     const cutoffTime = new Date(today);
     cutoffTime.setHours(8, 0, 0, 0);
 
-    if (now > cutoffTime) {
+    // 관리자는 시간 제한 없이 취소 가능
+    if (user?.role !== "admin" && now > cutoffTime) {
       setReservationsError("오전 8시 이후에는 관리자에게 문의해주세요.");
       return;
     }
@@ -225,15 +226,18 @@ function MyPage() {
                     borderRadius: "4px",
                     cursor: "pointer",
                     opacity:
+                      user?.role !== "admin" &&
                       new Date() > new Date(new Date().setHours(8, 0, 0, 0))
                         ? 0.5
                         : 1,
                   }}
                   disabled={
+                    user?.role !== "admin" &&
                     new Date() > new Date(new Date().setHours(8, 0, 0, 0))
                   }
                 >
-                  {new Date() > new Date(new Date().setHours(8, 0, 0, 0))
+                  {user?.role !== "admin" &&
+                  new Date() > new Date(new Date().setHours(8, 0, 0, 0))
                     ? "취소 불가 (8시 이후)"
                     : "예약 취소"}
                 </button>
