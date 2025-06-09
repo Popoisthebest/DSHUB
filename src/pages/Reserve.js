@@ -201,6 +201,7 @@ function Reserve() {
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
     // 이번 주 월요일 날짜 계산
+    // 일요일(0)인 경우 6을 빼서 이전 주 월요일로, 그 외 요일은 해당 요일 - 1을 빼서 이번 주 월요일로
     const mondayOfCurrentWeek = new Date(today);
     mondayOfCurrentWeek.setDate(
       today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
@@ -514,6 +515,55 @@ function Reserve() {
           </div>
         </div>
       ))}
+      {selectedWing.name === "ORYANG HALL" && (
+        <div
+          style={{
+            marginTop: "2rem",
+            padding: "1.5rem",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "8px",
+          }}
+        >
+          <h4 style={{ marginBottom: "1rem", color: "var(--primary-color)" }}>
+            사용 및 예약 방식
+          </h4>
+          <p style={{ marginBottom: "1rem", color: "var(--text-color)" }}>
+            <strong>멀티실:</strong> 멀티실은 제한 없이 예약이 가능하나, 멀티실
+            3개 이상의 대여가 필요한 행사의 경우 담당 교사 분들에게 미리 연락을
+            해주시기 바랍니다.
+          </p>
+          <p style={{ color: "var(--text-color)" }}>
+            <strong>자주실:</strong> 자주실은 정숙 및 분위기 유지를 위해서 CIP
+            1차시 이후에는 예약이 불가능합니다.
+          </p>
+        </div>
+      )}
+      {selectedWing.name === "RIGHT WING" && (
+        <div
+          style={{
+            marginTop: "2rem",
+            padding: "1.5rem",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "8px",
+          }}
+        >
+          <h4 style={{ marginBottom: "1rem", color: "var(--primary-color)" }}>
+            사용 및 예약 방식
+          </h4>
+          <p style={{ marginBottom: "1rem", color: "var(--text-color)" }}>
+            <strong>STUDY cafe:</strong> 스터디 카페의 그룹실은 최대 6명이
+            한번에 이용이 가능합니다. 개인석의 경우 입장 가능 인원만 제한하며
+            좌석 배치의 경우 선착순으로 자율적으로 진행하시면 됩니다. *1인 1석
+            엄수, 정숙 및 분위기 유지 필수!
+          </p>
+          <p style={{ color: "var(--text-color)" }}>
+            <strong>소그룹실(3층, 4층):</strong> 소그룹실의 경우 지정석을 제외한
+            나머지 공간은 신청 없이 자율적으로 이용이 가능합니다. 다만 수용
+            인원을 과도하게 초과하여 이용하는 경우 담당 교사분들에 의하여 이용이
+            제한 될 수 있음을 말씀드립니다.
+          </p>
+        </div>
+      )}
     </div>
   );
 
