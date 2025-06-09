@@ -15,6 +15,7 @@ import Reservations from "./pages/Reservations";
 import MyPage from "./pages/MyPage";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+import CompleteProfile from "./pages/CompleteProfile";
 import "./styles/common.css";
 
 // 보호된 라우트 컴포넌트
@@ -25,6 +26,11 @@ function ProtectedRoute({ children }) {
     return (
       <div style={{ textAlign: "center", padding: "2rem" }}>로딩 중...</div>
     );
+  }
+
+  // 사용자가 로그인했지만 프로필이 불완전한 경우 프로필 완성 페이지로 리다이렉트
+  if (user && !user.profileComplete) {
+    return <Navigate to="/complete-profile" replace />;
   }
 
   if (!user) {
@@ -58,6 +64,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/complete-profile" element={<CompleteProfile />} />
           <Route
             path="/reserve"
             element={

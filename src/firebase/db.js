@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   onSnapshot,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "./config";
 
@@ -226,6 +227,39 @@ export const getAllNotices = async () => {
     }));
   } catch (error) {
     console.error("Error getting all notices:", error);
+    throw error;
+  }
+};
+
+// 사용자 프로필 생성 또는 업데이트
+export const createUserProfile = async (uid, studentId, name) => {
+  try {
+    await setDoc(
+      doc(db, "userProfiles", uid),
+      {
+        // userProfiles 컬렉션에 UID를 문서 ID로 사용
+        studentId: studentId,
+        name: name,
+        createdAt: new Date(),
+      },
+      { merge: true }
+    ); // 기존 문서가 있으면 업데이트, 없으면 생성
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 사용자 프로필 조회
+export const getUserProfile = async (uid) => {
+  try {
+    const docRef = doc(db, "userProfiles", uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data();
+    } else {
+      return null; // 프로필이 없는 경우
+    }
+  } catch (error) {
     throw error;
   }
 };
