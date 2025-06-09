@@ -147,7 +147,7 @@ function Home() {
             <p style={{ margin: "0", color: "var(--text-color)" }}>
               패드에서도 쉽게 이용할 수 있는 반응형 디자인을 제공합니다.
             </p>
-            <div style={{ marginTop: "1rem", fontSize: "2rem" }}>💻</div>
+            <div style={{ marginTop: "1rem", fontSize: "2rem" }}>📱</div>
           </div>
         </div>
       </div>
