@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 이 리스너는 초기 로드, 로그인, 로그아웃 이벤트를 모두 처리합니다.
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       setLoading(true); // 로딩 시작
 
@@ -29,7 +28,6 @@ export const AuthProvider = ({ children }) => {
           if (firebaseUser.email === "admin@dshs.kr") {
             userRole = "admin";
           }
-
           const userProfile = await getUserProfile(firebaseUser.uid);
 
           const appUser = {
@@ -74,14 +72,17 @@ export const AuthProvider = ({ children }) => {
       setLoading(false); // 로딩 종료
     });
 
-    return () => unsubscribe(); // 언마운트 시 리스너 정리
-  }, []); // 빈 종속성 배열, 마운트 시 한 번 실행
+    return () => {
+      unsubscribe(); // 언마운트 시 리스너 정리
+    };
+  }, []);
 
   const googleLogin = async () => {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider); // Capture result here
+      // onAuthStateChanged will handle setting the user based on 'result.user'
     } catch (error) {
       console.error("Google 로그인 오류:", error);
       // 에러 메시지를 더 구체적으로 제공
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
         errorMessage = "로그인 팝업이 닫혔습니다.";
       }
       alert(errorMessage);
-      setUser(null);
+      setUser(null); // Ensure user is null on error
       localStorage.removeItem("user");
       setLoading(false);
     }
