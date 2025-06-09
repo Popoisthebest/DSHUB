@@ -66,6 +66,11 @@ function Header() {
                       ? "var(--primary-color)"
                       : "var(--text-color)",
                   fontWeight: location.pathname === "/" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 홈
@@ -87,6 +92,11 @@ function Header() {
                       ? "var(--primary-color)"
                       : "var(--text-color)",
                   fontWeight: location.pathname === "/reserve" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/reserve"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 예약하기
@@ -109,6 +119,11 @@ function Header() {
                       : "var(--text-color)",
                   fontWeight:
                     location.pathname === "/reservations" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/reservations"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 예약현황
@@ -130,6 +145,11 @@ function Header() {
                       ? "var(--primary-color)"
                       : "var(--text-color)",
                   fontWeight: location.pathname === "/mypage" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/mypage"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 마이페이지
@@ -146,6 +166,11 @@ function Header() {
                         ? "var(--primary-color)"
                         : "var(--text-color)",
                     fontWeight: location.pathname === "/admin" ? "700" : "500",
+                    padding: "0.5rem 1rem",
+                    borderBottom:
+                      location.pathname === "/admin"
+                        ? "2px solid var(--primary-color)"
+                        : "none",
                   }}
                 >
                   관리자
