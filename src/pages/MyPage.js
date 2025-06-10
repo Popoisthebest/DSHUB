@@ -33,10 +33,8 @@ function MyPage() {
   useEffect(() => {
     if (user) {
       if (user.role === "admin") {
-        // 관리자는 개인 예약 현황을 볼 필요가 없으므로 로딩 상태를 즉시 종료합니다.
-        setLoadingReservations(false);
-        setUserReservations([]); // 빈 배열로 설정하여 "예약된 내 공간이 없습니다." 메시지가 보이도록
-        setReservationsError(""); // 에러 메시지 초기화
+        // 관리자도 자신의 예약 현황을 볼 수 있도록 수정합니다.
+        loadUserReservations("admin");
       } else if (user.studentId) {
         // 학생 사용자는 학번을 기준으로 예약 현황을 불러옵니다.
         loadUserReservations(user.studentId);
@@ -138,7 +136,8 @@ function MyPage() {
             </p>
           )}
           <p style={{ fontSize: "1.1rem", color: "var(--text-color)" }}>
-            <strong>이름:</strong> {user.name}
+            <strong>이름:</strong>{" "}
+            {user?.role === "admin" ? "관리자" : user.name}
           </p>
         </div>
 

@@ -288,22 +288,22 @@ function Reservations() {
                           <p
                             style={{
                               margin: "0.2rem 0",
-                              fontSize: "0.8rem",
-                              color: "var(--text-color-light)",
+                              fontSize: "0.9rem",
+                              color: "var(--text-color)",
                             }}
                           >
-                            {user?.role === "admin"
-                              ? reservation.studentName
-                              : maskName(reservation.studentName)}
+                            장소: {reservation.room}
                           </p>
                           <p
                             style={{
-                              margin: "0.2rem 0",
-                              fontSize: "0.8rem",
-                              color: "var(--text-color-light)",
+                              color: "var(--text-color)",
+                              marginBottom: "0.5rem",
                             }}
                           >
-                            {reservation.room}
+                            예약자:{" "}
+                            {reservation.studentId === "admin"
+                              ? "관리자"
+                              : maskName(reservation.studentName)}
                           </p>
                         </div>
                       ))}
@@ -368,15 +368,10 @@ function Reservations() {
             <div style={{ lineHeight: "1.8" }}>
               <p>
                 <strong>예약자:</strong>{" "}
-                {user?.role === "admin"
-                  ? selectedReservation.studentName
+                {selectedReservation.studentId === "admin"
+                  ? "관리자"
                   : maskName(selectedReservation.studentName)}
               </p>
-              {user?.role === "admin" && selectedReservation.studentId && (
-                <p>
-                  <strong>학번:</strong> {selectedReservation.studentId}
-                </p>
-              )}
               <p>
                 <strong>장소:</strong> {selectedReservation.room}
               </p>

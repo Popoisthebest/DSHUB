@@ -244,7 +244,11 @@ function Reserve() {
             availableDates[availableDates.length - 1]
           );
 
+          console.log(
+            `Fetching reservations for room: ${selectedRoom.name}, from ${startOfWeekStr} to ${endOfWeekStr}`
+          );
           const data = await getAllReservations(startOfWeekStr, endOfWeekStr);
+          console.log("Raw reservations data fetched:", data);
 
           const groupedReservations = data.reduce((acc, reservation) => {
             const dateKey = reservation.date;
@@ -270,13 +274,16 @@ function Reserve() {
   }, [step, selectedRoom]); // selectedRoom을 의존성 배열에 추가
 
   // 예약 생성 함수
-  const handleReservation = async (timeSlot) => {
+  const handleReservation = async () => {
     if (!user) {
       setError("로그인 후 예약해주세요.");
       return;
     }
+    if (!selectedTime) {
+      setError("예약할 시간을 선택해주세요.");
+      return;
+    }
     if (!reason.trim()) {
-      // 이용 사유만 필수
       setError("이용 사유를 입력해주세요.");
       return;
     }
@@ -289,7 +296,7 @@ function Reserve() {
       const existingReservations = await getReservationsByDate(
         formatDateToYYYYMMDD(selectedDate),
         selectedRoom.name,
-        timeSlot.id
+        selectedTime.id
       );
 
       const isAlreadyBooked = existingReservations.some(
@@ -311,8 +318,8 @@ function Reserve() {
         floor: selectedRoom.floor,
         room: selectedRoom.name,
         date: formatDateToYYYYMMDD(selectedDate),
-        time: timeSlot.id,
-        timeRange: timeSlot.time,
+        time: selectedTime.id,
+        timeRange: selectedTime.time,
         club: club.trim(), // 동아리 정보 (선택 사항)
         reason: reason.trim(), // 이용 사유 정보 (필수)
         status: "active",
@@ -324,13 +331,11 @@ function Reserve() {
         state: { message: "예약이 완료되었습니다!", type: "success" },
       });
     } catch (error) {
-      // catch 블록 시작
       setError(
         error.message || "예약 중 오류가 발생했습니다. 다시 시도해주세요."
       );
       console.error("예약 오류:", error);
     } finally {
-      // finally 블록 시작
       setLoading(false);
     }
   };
@@ -688,7 +693,7 @@ function Reserve() {
       filteredTimeSlots = TIME_SLOTS.filter((slot) => slot.id === "lunch"); // 점심시간만
     }
 
-    const dailyReservationsForRoom =
+    const dateReservations =
       weekReservations[formatDateToYYYYMMDD(selectedDate)] || [];
 
     return (
@@ -724,85 +729,141 @@ function Reserve() {
               slotTime.setHours(slot.hour, slot.minute, 0, 0);
               const isDisabledByTime = isTodaySelected && slotTime <= now;
 
-              // 이미 예약된 시간인지 확인 (선택된 장소의 예약만)
-              const isReserved = dailyReservationsForRoom.some(
+              const isBooked = dateReservations.some(
                 (res) =>
-                  res.roomId === selectedRoom.id &&
+                  res.room === selectedRoom.name &&
                   res.time === slot.id &&
                   res.status === "active"
               );
 
-              const isDisabled = isDisabledByTime || isReserved;
+              const isDisabledRoom = selectedRoom.disabled;
+              const isTeacherOnlyRoom = selectedRoom.teacherOnly;
+              const isAdmin = user?.role === "admin";
+
+              const canReserve =
+                !isDisabledRoom && (!isTeacherOnlyRoom || isAdmin);
+
+              const finalDisabled = isDisabledByTime || isBooked || !canReserve;
 
               return (
-                <div
+                <button
                   key={slot.id}
                   onClick={() => {
-                    if (!loading && !isDisabled) {
+                    if (!loading && !finalDisabled) {
                       setSelectedTime(slot);
-                    } else if (isDisabledByTime) {
-                      setError("현재 시간보다 이전 시간은 예약할 수 없습니다.");
-                    } else if (isReserved) {
-                      setError("이미 예약된 시간입니다.");
+                      setError(""); // Clear error on valid selection
                     }
                   }}
+                  disabled={finalDisabled}
                   style={{
                     padding: "1.5rem",
                     border: `1px solid ${
-                      isReserved
-                        ? "#d0d0d0" // 예약 완료 시 테두리 색상 변경
-                        : isDisabledByTime
-                        ? "#e0e0e0"
+                      isBooked
+                        ? "#d0d0d0"
+                        : !canReserve || isDisabledByTime
+                        ? "#c0c0c0"
+                        : selectedTime?.id === slot.id
+                        ? "var(--primary-color)"
                         : "var(--border-color)"
                     }`,
                     borderRadius: "8px",
-                    cursor: loading || isDisabled ? "not-allowed" : "pointer",
-                    transition: "all 0.3s ease",
-                    backgroundColor: isReserved
-                      ? "#f0f0f0" // 예약 완료 시 배경색 변경
-                      : isDisabledByTime
-                      ? "#f5f5f5"
+                    backgroundColor: isBooked
+                      ? "#f0f0f0"
+                      : !canReserve || isDisabledByTime
+                      ? "#e8e8e8"
+                      : selectedTime?.id === slot.id
+                      ? "var(--primary-color)"
                       : "white",
-                    textAlign: "center",
-                    opacity: loading || isDisabled ? 0.7 : 1,
-                    borderColor:
-                      selectedTime?.id === slot.id && !isReserved
-                        ? "var(--primary-color)"
-                        : undefined,
-                    boxShadow:
-                      selectedTime?.id === slot.id && !isReserved
-                        ? "0 0 0 2px var(--primary-color)"
-                        : undefined,
+                    color: isBooked
+                      ? "#a0a0a0"
+                      : !canReserve || isDisabledByTime
+                      ? "#707070"
+                      : selectedTime?.id === slot.id
+                      ? "white"
+                      : "var(--text-color)",
+                    cursor: finalDisabled ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    position: "relative",
+                    textAlign: "left",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    opacity: finalDisabled ? 0.7 : 1,
                   }}
                 >
-                  <h4
-                    style={{
-                      marginBottom: "0.5rem",
-                      color: isDisabled ? "#888" : "inherit", // 비활성화 시 텍스트 색상 변경
-                    }}
-                  >
-                    {slot.name}
-                  </h4>
-                  <p
-                    style={{
-                      color: isDisabled ? "#888" : "var(--text-color)", // 비활성화 시 텍스트 색상 변경
-                    }}
-                  >
-                    {slot.time}
-                  </p>
-                  {isReserved && (
-                    <p
+                  <div>
+                    <h4
                       style={{
-                        color: "#dc3545", // 예약 완료 텍스트는 빨간색 유지
-                        fontSize: "0.85rem",
-                        marginTop: "0.5rem",
-                        fontWeight: "500",
+                        marginBottom: "0.5rem",
+                        color: isBooked
+                          ? "#a0a0a0"
+                          : !canReserve || isDisabledByTime
+                          ? "#707070"
+                          : selectedTime?.id === slot.id
+                          ? "white"
+                          : "var(--text-color)",
                       }}
                     >
-                      (예약 완료)
+                      {slot.name}
+                    </h4>
+                    <p
+                      style={{
+                        color: isBooked
+                          ? "#a0a0a0"
+                          : !canReserve || isDisabledByTime
+                          ? "#707070"
+                          : selectedTime?.id === slot.id
+                          ? "white"
+                          : "var(--text-color)",
+                      }}
+                    >
+                      {slot.time}
                     </p>
+                  </div>
+                  {isBooked ? (
+                    <span
+                      style={{
+                        backgroundColor: "#e9ecef",
+                        color: "#868e96",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      예약됨
+                    </span>
+                  ) : !canReserve || isDisabledByTime ? (
+                    <span
+                      style={{
+                        backgroundColor: "#e9ecef",
+                        color: "#868e96",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      {isDisabledByTime
+                        ? "시간 초과"
+                        : isDisabledRoom
+                        ? "비활성화"
+                        : isTeacherOnlyRoom
+                        ? "교사 전용"
+                        : "예약 불가"}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        backgroundColor: "#e7f5ff",
+                        color: "#1971c2",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      예약 가능
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })
           )}
@@ -863,7 +924,7 @@ function Reserve() {
               setError("이용 사유를 입력해주세요.");
               return;
             }
-            handleReservation(selectedTime);
+            handleReservation();
           }}
           disabled={loading || !selectedTime || !reason.trim()}
           style={{
