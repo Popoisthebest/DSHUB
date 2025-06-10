@@ -69,7 +69,7 @@ function MyPage() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const cutoffTime = new Date(today);
-    cutoffTime.setHours(8, 0, 0, 0);
+    cutoffTime.setHours(13, 40, 0, 0);
 
     // 관리자는 시간 제한 없이 취소 가능
     if (user?.role !== "admin" && now > cutoffTime) {
