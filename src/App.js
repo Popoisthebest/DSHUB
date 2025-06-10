@@ -55,7 +55,15 @@ const AdminRoute = ({ children }) => {
 };
 
 function AppContent() {
+  const { user } = useAuth();
+
   useEffect(() => {
+    // 관리자일 경우 개발자 도구 제한을 적용하지 않습니다.
+    if (user && user.isAdmin) {
+      console.log("관리자 계정입니다. 개발자 도구 제한을 적용하지 않습니다.");
+      return;
+    }
+
     // 개발자 도구 단축키 차단
     const handleKeyDown = (event) => {
       if (
@@ -97,7 +105,7 @@ function AppContent() {
       document.removeEventListener("keydown", handleKeyDown);
       clearInterval(interval);
     };
-  }, []); // 빈 배열: 컴포넌트 마운트 시 한 번만 실행
+  }, [user]);
 
   return (
     <div

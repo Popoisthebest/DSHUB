@@ -111,6 +111,7 @@ export const AuthProvider = ({ children }) => {
           role: TEACHER_ACCOUNT.role,
           isAdmin: true,
           profileComplete: true,
+          studentId: "admin",
         };
         setUser(teacherUser);
         localStorage.setItem("teacherUser", JSON.stringify(teacherUser));

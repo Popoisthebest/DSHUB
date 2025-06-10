@@ -305,8 +305,8 @@ function Reserve() {
       }
 
       const reservationData = {
-        studentId: user.studentId,
-        studentName: user.name,
+        studentId: user.isAdmin ? "admin" : user.studentId,
+        studentName: user.name || user.displayName || "알 수 없음",
         wing: selectedWing.name,
         floor: selectedRoom.floor,
         room: selectedRoom.name,
@@ -630,17 +630,23 @@ function Reserve() {
                   style={{
                     padding: "1.5rem",
                     border: `1px solid ${
-                      isDisabledDate ? "#e0e0e0" : "var(--border-color)"
+                      isDisabledDate ? "#c0c0c0" : "var(--border-color)"
                     }`,
                     borderRadius: "8px",
                     cursor: isDisabledDate ? "not-allowed" : "pointer",
                     transition: "all 0.3s ease",
-                    backgroundColor: isDisabledDate ? "#f5f5f5" : "white",
+                    backgroundColor: isDisabledDate ? "#e0e0e0" : "white",
                     textAlign: "center",
-                    opacity: isDisabledDate ? 0.6 : 1,
+                    opacity: isDisabledDate ? 0.7 : 1,
                   }}
                 >
-                  <p style={{ fontSize: "1.2rem", fontWeight: "500" }}>
+                  <p
+                    style={{
+                      fontSize: "1.2rem",
+                      fontWeight: "500",
+                      color: isDisabledDate ? "#a0a0a0" : "inherit",
+                    }}
+                  >
                     {formatDate(date)}
                   </p>
                   {isDisabledDate && (
