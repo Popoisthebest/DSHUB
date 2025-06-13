@@ -16,6 +16,7 @@ import MyPage from "./pages/MyPage";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import CompleteProfile from "./pages/CompleteProfile";
+import Inquiry from "./pages/Inquiry";
 import "./styles/common.css";
 
 // 보호된 라우트 컴포넌트
@@ -149,6 +150,7 @@ function AppContent() {
               </AdminRoute>
             }
           />
+          <Route path="/inquiry" element={<Inquiry />} />
         </Routes>
       </main>
       <Footer />

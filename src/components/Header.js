@@ -9,9 +9,13 @@ function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("로그아웃 오류:", error);
+    }
   };
 
   return (
@@ -127,6 +131,26 @@ function Header() {
                 }}
               >
                 예약현황
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/inquiry"
+                style={{
+                  textDecoration: "none",
+                  color:
+                    location.pathname === "/inquiry"
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                  fontWeight: location.pathname === "/inquiry" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/inquiry"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
+                }}
+              >
+                문의하기
               </Link>
             </li>
             <li>

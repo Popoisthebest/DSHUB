@@ -11,6 +11,7 @@ import {
   orderBy,
   onSnapshot,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./config";
 
@@ -260,6 +261,41 @@ export const getUserProfile = async (uid) => {
       return null; // 프로필이 없는 경우
     }
   } catch (error) {
+    throw error;
+  }
+};
+
+// 문의 추가
+export const addInquiry = async (inquiryData) => {
+  try {
+    const inquiryRef = collection(db, "inquiries");
+    await addDoc(inquiryRef, {
+      ...inquiryData,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("문의 추가 오류:", error);
+    throw error;
+  }
+};
+
+// 문의 목록 조회
+export const getInquiries = async (studentId) => {
+  try {
+    const inquiriesRef = collection(db, "inquiries");
+    const q = query(
+      inquiriesRef,
+      where("studentId", "==", studentId),
+      orderBy("createdAt", "desc")
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error("문의 목록 조회 오류:", error);
     throw error;
   }
 };
