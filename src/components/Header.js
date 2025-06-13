@@ -133,26 +133,29 @@ function Header() {
                 예약현황
               </Link>
             </li>
-            <li>
-              <Link
-                to="/inquiry"
-                style={{
-                  textDecoration: "none",
-                  color:
-                    location.pathname === "/inquiry"
-                      ? "var(--primary-color)"
-                      : "var(--text-color)",
-                  fontWeight: location.pathname === "/inquiry" ? "700" : "500",
-                  padding: "0.5rem 1rem",
-                  borderBottom:
-                    location.pathname === "/inquiry"
-                      ? "2px solid var(--primary-color)"
-                      : "none",
-                }}
-              >
-                문의하기
-              </Link>
-            </li>
+            {!user?.isAdmin && (
+              <li>
+                <Link
+                  to="/inquiry"
+                  style={{
+                    textDecoration: "none",
+                    color:
+                      location.pathname === "/inquiry"
+                        ? "var(--primary-color)"
+                        : "var(--text-color)",
+                    fontWeight:
+                      location.pathname === "/inquiry" ? "700" : "500",
+                    padding: "0.5rem 1rem",
+                    borderBottom:
+                      location.pathname === "/inquiry"
+                        ? "2px solid var(--primary-color)"
+                        : "none",
+                  }}
+                >
+                  문의하기
+                </Link>
+              </li>
+            )}
             <li>
               <Link
                 to="/mypage"
