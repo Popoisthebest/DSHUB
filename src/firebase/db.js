@@ -232,6 +232,21 @@ export const getAllNotices = async () => {
   }
 };
 
+// 공지사항 수정
+export const updateNotice = async (noticeId, updateData) => {
+  try {
+    const noticeRef = doc(db, "notices", noticeId);
+    await updateDoc(noticeRef, {
+      ...updateData,
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    console.error("공지사항 수정 오류:", error);
+    return false;
+  }
+};
+
 // 사용자 프로필 생성 또는 업데이트
 export const createUserProfile = async (uid, studentId, name) => {
   try {
