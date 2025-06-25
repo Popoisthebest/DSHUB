@@ -14,7 +14,7 @@ function InquiryList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedInquiry, setSelectedInquiry] = useState(null);
-  const [reply, setReply] = useState("");
+  const [reply, setReply] = useState({});
 
   useEffect(() => {
     const q = query(collection(db, "inquiries"), orderBy("createdAt", "desc"));
@@ -42,18 +42,18 @@ function InquiryList() {
 
   const handleReply = async (inquiryId) => {
     try {
-      if (!reply.trim()) {
+      if (!reply[inquiryId] || !reply[inquiryId].trim()) {
         throw new Error("답변 내용을 입력해주세요.");
       }
 
       const inquiryRef = doc(db, "inquiries", inquiryId);
       await updateDoc(inquiryRef, {
-        reply: reply.trim(),
+        reply: reply[inquiryId].trim(),
         replyDate: new Date(),
         status: "answered",
       });
 
-      setReply("");
+      setReply((prev) => ({ ...prev, [inquiryId]: "" }));
       setSelectedInquiry(null);
     } catch (error) {
       console.error("답변 등록 오류:", error);
@@ -164,8 +164,13 @@ function InquiryList() {
               <div>
                 <h4 style={{ margin: "0 0 0.5rem 0" }}>답변 작성</h4>
                 <textarea
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
+                  value={reply[inquiry.id] || ""}
+                  onChange={(e) =>
+                    setReply((prev) => ({
+                      ...prev,
+                      [inquiry.id]: e.target.value,
+                    }))
+                  }
                   style={{
                     width: "100%",
                     padding: "0.8rem",
