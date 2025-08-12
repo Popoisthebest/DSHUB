@@ -314,3 +314,62 @@ export const getInquiries = async (studentId) => {
     throw error;
   }
 };
+
+// 모든 장소 데이터를 실시간으로 구독
+export const listenToPlaces = (callback) => {
+  const q = query(
+    collection(db, "places"),
+    orderBy("wing"),
+    orderBy("floor"),
+    orderBy("order"), // 정렬 기준(옵션)
+    orderBy("name") // 동일 order에서 안정정렬
+  );
+  return onSnapshot(q, (snap) => {
+    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    callback(items);
+  });
+};
+
+// 모든 장소 데이터를 1회성으로 조회 (실시간과 동일 기준으로 정렬)
+export const getPlaces = async () => {
+  const q = query(
+    collection(db, "places"),
+    orderBy("wing"),
+    orderBy("floor"),
+    orderBy("order"),
+    orderBy("name")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+};
+
+// 장소 생성 또는 업데이트(merge)
+// - id 누락 방지
+// - 업데이트 타임스탬프 기록
+export const upsertPlace = async (place) => {
+  if (!place?.id) throw new Error("place.id는 필수입니다.");
+  await setDoc(
+    doc(db, "places", place.id),
+    {
+      ...place,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+};
+
+// 특정 장소의 일부 필드만 업데이트
+// - 업데이트 타임스탬프 기록
+export const updatePlace = async (id, patch) => {
+  if (!id) throw new Error("id는 필수입니다.");
+  await updateDoc(doc(db, "places", id), {
+    ...patch,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// place 문서 삭제
+export const deletePlace = async (id) => {
+  if (!id) throw new Error("id는 필수입니다.");
+  await deleteDoc(doc(db, "places", id));
+};
