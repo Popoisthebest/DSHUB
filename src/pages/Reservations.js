@@ -292,7 +292,7 @@ function Reservations() {
                               color: "var(--text-color)",
                             }}
                           >
-                            장소: {reservation.room}
+                            장소: {reservation.roomName}
                           </p>
                           <p
                             style={{
@@ -373,13 +373,22 @@ function Reservations() {
                   : maskName(selectedReservation.studentName)}
               </p>
               <p>
-                <strong>장소:</strong> {selectedReservation.room}
+                <strong>장소:</strong> {selectedReservation.roomName}
               </p>
               <p>
                 <strong>날짜:</strong> {selectedReservation.date}
               </p>
               <p>
-                <strong>시간:</strong> {selectedReservation.timeRange}
+                <strong>시간:</strong>{" "}
+                {selectedReservation.time === "lunch"
+                  ? "점심시간"
+                  : selectedReservation.time === "cip1"
+                  ? "CIP1"
+                  : selectedReservation.time === "cip2"
+                  ? "CIP2"
+                  : selectedReservation.time === "cip3"
+                  ? "CIP3"
+                  : selectedReservation.timeRange}
               </p>
               {selectedReservation.club && (
                 <p>

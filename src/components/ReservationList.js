@@ -383,7 +383,7 @@ function ReservationList() {
               </p>
               <p>
                 <strong>장소:</strong> {selectedReservation.wing} -{" "}
-                {selectedReservation.floor} - {selectedReservation.room}
+                {selectedReservation.floor} - {selectedReservation.roomName}
               </p>
               <p>
                 <strong>날짜:</strong>{" "}

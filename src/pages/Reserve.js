@@ -511,6 +511,12 @@ function Reserve() {
   // 변경: renderDateSelection (방 의존 제거, 클릭 시 step=2로)
   const renderDateSelection = () => {
     const availableDates = getAvailableDates();
+    const now = new Date();
+
+    // 오늘 00:00, 오늘 08:00 기준 시각 계산
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
     return (
       <div>
         <h3 style={{ marginBottom: "1.5rem" }}>예약할 날짜를 선택해주세요</h3>
@@ -521,31 +527,68 @@ function Reserve() {
             gap: "1rem",
           }}
         >
-          {availableDates.map((date) => (
-            <div
-              key={date.toISOString()}
-              onClick={() => {
-                setSelectedDate(date);
-                setSelectedTime(null);
-                setSelectedWing(null);
-                setSelectedRoom(null);
-                setStep(2);
-              }}
-              style={{
-                padding: "1.5rem",
-                border: "1px solid var(--border-color)",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                backgroundColor: "white",
-                textAlign: "center",
-              }}
-            >
-              <p style={{ fontSize: "1.2rem", fontWeight: "500" }}>
-                {formatDate(date)}
-              </p>
-            </div>
-          ))}
+          {availableDates.map((date) => {
+            const dateStart = new Date(date);
+            dateStart.setHours(0, 0, 0, 0);
+
+            const isPastDate = dateStart < todayStart; // 지난 날짜
+            const isToday = dateStart.getTime() === todayStart.getTime();
+            const isDisabledDate = isPastDate;
+
+            // 안내 문구 (선택)
+            const disabledReason = isPastDate
+              ? "예약 가능 기간이 아닙니다"
+              : "";
+
+            return (
+              <div
+                key={date.toISOString()}
+                onClick={() => {
+                  if (!isDisabledDate) {
+                    setSelectedDate(date);
+                    setSelectedTime(null);
+                    setSelectedWing(null);
+                    setSelectedRoom(null);
+                    setStep(2);
+                  }
+                }}
+                style={{
+                  padding: "1.5rem",
+                  border: `1px solid ${
+                    isDisabledDate ? "#c0c0c0" : "var(--border-color)"
+                  }`,
+                  borderRadius: "8px",
+                  cursor: isDisabledDate ? "not-allowed" : "pointer",
+                  transition: "all 0.3s ease",
+                  backgroundColor: isDisabledDate ? "#e0e0e0" : "white",
+                  textAlign: "center",
+                  opacity: isDisabledDate ? 0.7 : 1,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: "500",
+                    color: isDisabledDate ? "#a0a0a0" : "inherit",
+                  }}
+                >
+                  {formatDate(date)}
+                </p>
+                {isDisabledDate && (
+                  <p
+                    style={{
+                      color: "#dc3545",
+                      fontSize: "0.85rem",
+                      marginTop: "0.5rem",
+                      fontWeight: 500,
+                    }}
+                  >
+                    ({disabledReason})
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -557,6 +600,8 @@ function Reserve() {
     const isTodaySelected =
       selectedDate &&
       formatDateToYYYYMMDD(selectedDate) === formatDateToYYYYMMDD(now);
+
+    // 요일별 사용 가능한 슬롯
     const dayOfWeek = selectedDate ? selectedDate.getDay() : -1;
     let filteredTimeSlots = [];
     if (dayOfWeek >= 1 && dayOfWeek <= 4) filteredTimeSlots = TIME_SLOTS;
@@ -576,46 +621,50 @@ function Reserve() {
           {filteredTimeSlots.map((slot) => {
             const slotTime = new Date(selectedDate);
             slotTime.setHours(slot.hour, slot.minute, 0, 0);
-            const isDisabledByTime = isTodaySelected && slotTime <= now;
+
+            // 이미 지난 시간(당일만)
+            const isDisabledByTime = isTodaySelected && slotTime <= now; // 지난 시간
+
+            const finalDisabled = isDisabledByTime;
 
             return (
               <button
                 key={slot.id}
                 onClick={() => {
-                  if (!isDisabledByTime) {
+                  if (!finalDisabled) {
                     setSelectedTime(slot);
                     setSelectedWing(null);
                     setSelectedRoom(null);
                     setStep(3);
-                    resetError();
+                    setError("");
                   }
                 }}
-                disabled={isDisabledByTime}
+                disabled={finalDisabled}
                 style={{
                   padding: "1.5rem",
                   border: `1px solid ${
-                    isDisabledByTime
+                    finalDisabled
                       ? "#c0c0c0"
                       : selectedTime?.id === slot.id
                       ? "var(--primary-color)"
                       : "var(--border-color)"
                   }`,
                   borderRadius: "8px",
-                  backgroundColor: isDisabledByTime
+                  backgroundColor: finalDisabled
                     ? "#e8e8e8"
                     : selectedTime?.id === slot.id
                     ? "var(--primary-color)"
                     : "white",
-                  color: isDisabledByTime
+                  color: finalDisabled
                     ? "#707070"
                     : selectedTime?.id === slot.id
                     ? "white"
                     : "var(--text-color)",
-                  cursor: isDisabledByTime ? "not-allowed" : "pointer",
+                  cursor: finalDisabled ? "not-allowed" : "pointer",
                   transition: "all 0.3s ease",
-                  textAlign: "left",
+                  textAlign: "center",
                   display: "flex",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
                   alignItems: "center",
                 }}
               >
@@ -623,17 +672,6 @@ function Reserve() {
                   <h4 style={{ marginBottom: "0.5rem" }}>{slot.name}</h4>
                   <p>{slot.time}</p>
                 </div>
-                <span
-                  style={{
-                    backgroundColor: isDisabledByTime ? "#e9ecef" : "#e7f5ff",
-                    color: isDisabledByTime ? "#868e96" : "#1971c2",
-                    padding: "0.5rem 1rem",
-                    borderRadius: "4px",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  {isDisabledByTime ? "시간 초과" : "선택 가능"}
-                </span>
               </button>
             );
           })}
