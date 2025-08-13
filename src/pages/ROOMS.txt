@@ -1,0 +1,144 @@
+const ROOMS = {
+  leftWing: {
+    name: "LEFT WING",
+    floors: [
+      {
+        floor: "1st FLOOR",
+        rooms: [
+          { id: "maker1", name: "제1 메이커실", capacity: "20인" },
+          { id: "maker2", name: "제2 메이커실", capacity: "20인" },
+          {
+            id: "woodwork",
+            name: "목공실",
+            capacity: "15인",
+            teacherOnly: true,
+          },
+          {
+            id: "laser",
+            name: "레이저실",
+            capacity: "15인",
+            teacherOnly: true,
+          },
+        ],
+      },
+      {
+        floor: "2nd FLOOR",
+        rooms: [
+          { id: "lab", name: "실험실", capacity: "30인", teacherOnly: true },
+          { id: "fusion1", name: "제1 융합실", capacity: "30인" },
+          { id: "fusion2", name: "제2 융합실", capacity: "30인" },
+          { id: "fusion3", name: "제3 융합실", capacity: "30인" },
+        ],
+      },
+      {
+        floor: "3rd FLOOR",
+        rooms: [
+          { id: "ai", name: "AI실", capacity: "30인", disabled: true },
+          {
+            id: "computer",
+            name: "컴퓨터실",
+            capacity: "30인",
+            disabled: true,
+          },
+        ],
+      },
+      {
+        floor: "4th FLOOR",
+        rooms: [
+          {
+            id: "media",
+            name: "미디어실(시청각실)",
+            capacity: "50인",
+            teacherOnly: true,
+          },
+          {
+            id: "global",
+            name: "글로벌 라운지",
+            capacity: "40인",
+            teacherOnly: true,
+          },
+        ],
+      },
+    ],
+  },
+  oryangHall: {
+    name: "ORYANG HALL",
+    floors: [
+      {
+        floor: "2nd FLOOR",
+        rooms: [
+          {
+            id: "aiReading",
+            name: "AI 리딩실",
+            capacity: "30인",
+            disabled: true,
+          },
+        ],
+      },
+      {
+        floor: "3rd FLOOR",
+        rooms: [
+          { id: "career", name: "진로실", capacity: "30인", disabled: true },
+        ],
+      },
+      {
+        floor: "멀티실",
+        rooms: [
+          { id: "multi1", name: "제1 멀티실", capacity: "20인" },
+          { id: "multi2", name: "제2 멀티실", capacity: "20인" },
+          { id: "multi3", name: "제3 멀티실", capacity: "20인" },
+          { id: "multi4", name: "제4 멀티실", capacity: "20인" },
+        ],
+      },
+      {
+        floor: "4th FLOOR",
+        rooms: [
+          {
+            id: "careerCounseling",
+            name: "진로진학상담실",
+            capacity: "20인",
+            disabled: true,
+          },
+          { id: "selfStudy4", name: "제4 자주실", capacity: "30인" },
+          { id: "selfStudy5", name: "제5 자주실", capacity: "30인" },
+          { id: "selfStudy6", name: "제6 자주실", capacity: "30인" },
+        ],
+      },
+    ],
+  },
+  rightWing: {
+    name: "RIGHT WING",
+    floors: [
+      {
+        floor: "STUDY cafe",
+        rooms: [
+          { id: "group1", name: "제1 그룹실", capacity: "6인" },
+          { id: "group2", name: "제2 그룹실", capacity: "6인" },
+          { id: "group3", name: "제3 그룹실", capacity: "6인" },
+          {
+            id: "individual",
+            name: "개인석",
+            capacity: "선착순 배정",
+            note: "지정좌석이 아닌 선착순 배정입니다",
+          },
+        ],
+      },
+      {
+        floor: "3rd FLOOR Lounge",
+        rooms: [
+          { id: "smallGroup1_3", name: "제1 소그룹실", capacity: "4인" },
+          { id: "smallGroup2_3", name: "제2 소그룹실", capacity: "4인" },
+          { id: "smallGroup3_3", name: "제3 소그룹실", capacity: "4인" },
+        ],
+      },
+      {
+        floor: "4th FLOOR Lounge",
+        rooms: [
+          { id: "smallGroup1_4", name: "제1 소그룹실", capacity: "4인" },
+          { id: "smallGroup2_4", name: "제2 소그룹실", capacity: "4인" },
+          { id: "smallGroup3_4", name: "제3 소그룹실", capacity: "4인" },
+        ],
+      },
+    ],
+  },
+};

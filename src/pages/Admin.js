@@ -110,7 +110,7 @@ function Admin() {
           >
             장소 관리
           </button>
-          <button
+          {/* <button
             onClick={() => setActiveTab("init_places")}
             style={{
               padding: "0.8rem 1.5rem",
@@ -129,14 +129,14 @@ function Admin() {
             }}
           >
             초기 장소 데이터 업로드
-          </button>
+          </button> */}
         </div>
 
         {activeTab === "notices" && <NoticeList />}
         {activeTab === "inquiries" && <InquiryList />}
         {activeTab === "reservations" && <ReservationList />}
         {activeTab === "places" && <PlaceList />}
-        {activeTab === "init_places" && <OneTimePlacesSeeder />}
+        {/* {activeTab === "init_places" && <OneTimePlacesSeeder />} */}
       </div>
     </div>
   );

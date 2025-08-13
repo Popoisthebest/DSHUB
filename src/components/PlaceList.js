@@ -49,14 +49,13 @@ function PlaceList() {
     await deletePlace(id);
   };
 
-  // 장소 추가 저장 (폼에서 넘어온 값을 그대로 사용)
+  // handleCreate, handleUpdate에 floor 저장 추가
   const handleCreate = async (form) => {
     if (!form.id || !form.name) {
       alert("ID와 장소명을 입력해주세요.");
       return;
     }
 
-    // 정책: teacherOnly 우선, 그 외 enabled=false면 기본 사유
     let disabledReason = form.disabledReason || "";
     if (form.teacherOnly) {
       disabledReason = "*교사만 신청 가능합니다.";
@@ -68,7 +67,7 @@ function PlaceList() {
       id: form.id,
       name: form.name,
       wing: selectedWing,
-      floor: "", // 윙-장소 모드이므로 비워둠(스키마 호환)
+      floor: form.floor || "", // 층수 저장
       capacity: form.capacity || "",
       enabled: !!form.enabled,
       teacherOnly: !!form.teacherOnly,
@@ -79,11 +78,9 @@ function PlaceList() {
     setCreating(false);
   };
 
-  // 장소 수정 저장 (폼에서 넘어온 최신 값 사용)
   const handleUpdate = async (form) => {
     if (!editing) return;
 
-    // 정책: teacherOnly 우선, 그 외 enabled=false면 기본 사유
     let disabledReason = form.disabledReason || "";
     if (form.teacherOnly) {
       disabledReason = "*교사만 신청 가능합니다.";
@@ -93,12 +90,12 @@ function PlaceList() {
 
     await updatePlace(editing.id, {
       name: form.name,
+      floor: form.floor || "", // 층수 저장
       capacity: form.capacity || "",
       enabled: !!form.enabled,
       teacherOnly: !!form.teacherOnly,
       order: form.order ?? 0,
       disabledReason,
-      // 필요 시 윙 이동 허용 시: wing: form.wing,
     });
 
     setEditing(null);
@@ -226,7 +223,7 @@ function PlaceList() {
                   borderRadius: 6,
                   border: "none",
                   background: "#ef4444",
-                  color: "#000",
+                  color: "#fff",
                   cursor: "pointer",
                 }}
               >
@@ -252,7 +249,6 @@ function PlaceList() {
           }}
           onCancel={() => setCreating(false)}
           onSave={handleCreate} // ← 폼값 직접 전달
-          showWing={false}
         />
       )}
 
@@ -263,7 +259,6 @@ function PlaceList() {
           initial={editing}
           onCancel={() => setEditing(null)}
           onSave={handleUpdate} // ← 폼값 직접 전달
-          showWing={false}
         />
       )}
     </div>
@@ -271,8 +266,9 @@ function PlaceList() {
 }
 
 // // 간단한 모달 컴포넌트(추가/수정 공용)
-function PlaceModal({ title, initial, onCancel, onSave, showWing }) {
+function PlaceModal({ title, initial, onCancel, onSave }) {
   const [form, setForm] = useState(initial);
+  const floorOptions = ["1st FLOOR", "2nd FLOOR", "3rd FLOOR", "4th FLOOR"];
 
   return (
     <div
@@ -330,24 +326,26 @@ function PlaceModal({ title, initial, onCancel, onSave, showWing }) {
           }}
         />
 
-        {/* 윙 이동 허용 시 */}
-        {showWing && (
-          <>
-            <label style={{ fontSize: 13 }}>윙</label>
-            <input
-              type="text"
-              value={form.wing}
-              onChange={(e) => setForm({ ...form, wing: e.target.value })}
-              style={{
-                width: "100%",
-                padding: 8,
-                margin: "4px 0 10px",
-                borderRadius: 6,
-                border: "1px solid #ccc",
-              }}
-            />
-          </>
-        )}
+        {/* 층수 선택 */}
+        <label style={{ fontSize: 13 }}>층수</label>
+        <select
+          value={form.floor || ""}
+          onChange={(e) => setForm({ ...form, floor: e.target.value })}
+          style={{
+            width: "100%",
+            padding: 8,
+            margin: "4px 0 10px",
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
+        >
+          <option value="">선택하세요</option>
+          {floorOptions.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
 
         {/* 수용 인원 */}
         <label style={{ fontSize: 13 }}>수용 인원</label>

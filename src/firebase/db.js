@@ -193,6 +193,36 @@ export const getUserReservations = async (studentId) => {
   }
 };
 
+// 특정 날짜, roomId, time의 예약 조회 (roomId 기준)
+export const getReservationsByDateV2 = async (
+  date,
+  roomId = null,
+  timeId = null
+) => {
+  try {
+    let q = query(
+      collection(db, "reservations"),
+      where("date", "==", date),
+      orderBy("time", "asc")
+    );
+
+    if (roomId) {
+      q = query(q, where("roomId", "==", roomId));
+    }
+    if (timeId) {
+      q = query(q, where("time", "==", timeId));
+    }
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 공지사항 생성
 export const createNotice = async (noticeData) => {
   try {
