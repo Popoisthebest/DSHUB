@@ -24,7 +24,7 @@ function Footer() {
       >
         <div>
           <h3 style={{ marginBottom: "0.5rem", color: "var(--primary-color)" }}>
-            DAESHILL
+            DSHUB
           </h3>
           <p style={{ color: "var(--text-color-light)", fontSize: "0.9rem" }}>
             대전대신고등학교 공간 예약 시스템

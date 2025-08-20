@@ -36,7 +36,7 @@ function Home() {
             color: "var(--secondary-color)",
           }}
         >
-          DAESHILL
+          DSHUB
         </h1>
         <p
           style={{
