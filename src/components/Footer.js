@@ -45,27 +45,11 @@ function Footer() {
             </a>
             ,{" "}
             <a
-              href="https://github.com/CloudR1ng"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              CloudR1ng
-            </a>
-            ,{" "}
-            <a
               href="https://github.com/UntameDuck"
               target="_blank"
               rel="noopener noreferrer"
             >
               UntameDuck
-            </a>
-            ,{" "}
-            <a
-              href="https://github.com/biro425"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              425
             </a>
           </p>
         </div>

@@ -31,8 +31,8 @@ function Reserve() {
   // Firestore에서 받은 원본 장소 리스트
   const [places, setPlaces] = useState([]);
 
-  // 윙/층/장소 선택 상태
-  const [selectedWing, setSelectedWing] = useState(null); // { name, floors: [...] } 형태로 맞춰서 세팅
+  // 층/장소 선택 상태
+  const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null); // { id, name, capacity, teacherOnly, enabled, floor }
 
   const [selectedDate, setSelectedDate] = useState(null);
@@ -51,6 +51,10 @@ function Reserve() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // [1] 상태 추가 (컴포넌트 상단의 useState 구역)
+  const [additionalCount, setAdditionalCount] = useState(0); // 본인 제외 인원수
+  const [participants, setParticipants] = useState([]); // [{studentId, name}]
+
   // ---------- 장소 구독 ----------
   useEffect(() => {
     // 모든 장소 실시간 구독 후 상태 저장
@@ -60,36 +64,46 @@ function Reserve() {
     return unsubscribe;
   }, []);
 
-  // ---------- UI용 트리 구조로 변환 (wing → floors → rooms) ----------
-  const roomTree = useMemo(() => {
+  // 층 정렬용 순위 함수: "1층" → 1, "2층" → 2, 그 외는 맨 뒤로
+  const floorRank = (label) => {
+    const s = String(label ?? "")
+      .replace(/\\/g, "")
+      .trim();
+    const m = s.match(/^(\d+)\s*층$/); // "1층", "2층" ...
+    if (m) return parseInt(m[1], 10);
+
+    // 혹시 남아있을 수 있는 "1st FLOOR" 같은 것까지 느슨하게 케어
+    const m2 = s.match(/^(\d+)/);
+    if (m2) return parseInt(m2[1], 10);
+
+    return Number.POSITIVE_INFINITY; // 숫자 못 뽑으면 뒤로
+  };
+
+  // NEW: floors 중심 트리
+  const floorTree = useMemo(() => {
     const list = Array.isArray(places) ? places : [];
 
-    // { [wing]: { name, floors: { [floor]: rooms[] } } }
-    const treeObj = list.reduce((acc, p) => {
-      const wingKey = p.wing ?? "";
-      if (!acc[wingKey]) acc[wingKey] = { name: wingKey, floors: {} };
-
-      const floorKey = p.floor ?? ""; // floor 비어 있을 수 있음
-      if (!acc[wingKey].floors[floorKey]) acc[wingKey].floors[floorKey] = [];
-
-      acc[wingKey].floors[floorKey].push(p);
+    // 1) 층 → 방들
+    const byFloor = list.reduce((acc, p) => {
+      const floorKey = p.floor ?? "";
+      if (!acc[floorKey]) acc[floorKey] = [];
+      acc[floorKey].push(p);
       return acc;
     }, {});
 
-    // floors 객체를 [{ floor, rooms }] 배열로 변환 (활성 우선 정렬)
-    const withArrays = Object.values(treeObj).map((wing) => ({
-      name: wing.name,
-      floors: Object.entries(wing.floors).map(([floor, rooms]) => ({
-        floor,
-        rooms: rooms.slice().sort(
-          (a, b) =>
-            Number(Boolean(b.enabled)) - Number(Boolean(a.enabled)) || // enabled=true 먼저
-            String(a.name ?? "").localeCompare(String(b.name ?? ""))
-        ),
-      })),
-    }));
-
-    return withArrays;
+    // 2) 정렬 포함(활성 우선 → 이름순)
+    return Object.entries(byFloor)
+      .sort(([fa], [fb]) => floorRank(fa) - floorRank(fb))
+      .map(([floor, rooms]) => ({
+        name: floor,
+        rooms: rooms
+          .slice()
+          .sort(
+            (a, b) =>
+              Number(Boolean(b.enabled)) - Number(Boolean(a.enabled)) ||
+              String(a.name ?? "").localeCompare(String(b.name ?? ""))
+          ),
+      }));
   }, [places]);
 
   // ---------- 날짜 포맷/주간생성 유틸(기존 그대로) ----------
@@ -167,6 +181,34 @@ function Reserve() {
     fetchWeekReservations();
   }, [selectedDate]);
 
+  // 참가자(본인 제외) 중복 검사: 학번과 이름이 모두 동일하면 동일인으로 간주
+  const findDuplicateParticipantIndexes = (arr) => {
+    const seen = new Map(); // key: "studentId|name" (trim)
+    const dupIdx = new Set(); // 중복 인덱스 모음
+    arr.forEach((p, i) => {
+      const id = (p.studentId ?? "").trim();
+      const nm = (p.name ?? "").trim();
+      if (!id || !nm) return; // 비어있으면 중복 판단 제외
+      const key = `${id}|${nm}`;
+      if (seen.has(key)) {
+        dupIdx.add(seen.get(key));
+        dupIdx.add(i);
+      } else {
+        seen.set(key, i);
+      }
+    });
+    return Array.from(dupIdx).sort((a, b) => a - b);
+  };
+
+  // 모든 참가자 필수 입력이 채워졌는지?
+  const areParticipantsComplete = (additionalCount, participants) => {
+    if (additionalCount === 0) return true;
+    if (participants.length !== additionalCount) return false;
+    return participants.every(
+      (p) => (p.studentId ?? "").trim() && (p.name ?? "").trim()
+    );
+  };
+
   // ---------- 예약 생성 ----------
   const handleReservation = async () => {
     if (!user) {
@@ -175,6 +217,10 @@ function Reserve() {
     }
     if (!selectedTime) {
       setError("예약할 시간을 선택해주세요.");
+      return;
+    }
+    if (!selectedRoom) {
+      setError("장소를 선택해주세요.");
       return;
     }
     if (!reason.trim()) {
@@ -186,39 +232,72 @@ function Reserve() {
     setError("");
 
     try {
-      // ✅ roomId 기준으로 중복 체크
-      const existingReservations = await getReservationsByDateV2(
-        formatDateToYYYYMMDD(selectedDate),
+      const dateStr = formatDateToYYYYMMDD(selectedDate);
+
+      // 1) 인원 계산/검증
+      const perMin = getPerReservationMin(selectedRoom); // 팀당 최소(본인 포함)
+      const capacity = getCapacity(selectedRoom); // 총 정원(null=무제한)
+      const groupSize = 1 + (parseInt(additionalCount, 10) || 0); // 본인 포함 총 인원
+
+      if (groupSize < perMin) {
+        setError(`이 공간은 팀당 최소 ${perMin}명부터 예약 가능합니다.`);
+        setLoading(false);
+        return;
+      }
+
+      // 2) 해당 시간대 사용 중 정원 계산 (여러 팀 허용)
+      const existing = await getReservationsByDateV2(
+        dateStr,
         selectedRoom.id,
         selectedTime.id
       );
+      const used = existing
+        .filter((r) => r.status === "active")
+        .reduce((sum, r) => sum + (Number(r.groupSize) || 1), 0);
 
-      const isAlreadyBooked = existingReservations.some(
-        (res) => res.status === "active"
-      );
-      if (isAlreadyBooked) {
+      if (capacity != null && groupSize > Math.max(0, capacity - used)) {
         setError(
-          "선택하신 시간은 이미 예약되었습니다. 다른 시간을 선택해주세요."
+          `남은 정원은 ${Math.max(
+            0,
+            capacity - used
+          )}명입니다. 인원을 조정하거나 다른 시간/공간을 선택하세요.`
         );
         setLoading(false);
         return;
       }
 
-      // ✅ 예약 문서에 roomId + roomName 둘 다 저장
+      // 3) 참가자(본인 제외) 입력 검증
+      if (
+        participants.length !== groupSize - 1 ||
+        participants.some((p) => !p.studentId?.trim() || !p.name?.trim())
+      ) {
+        setError("참가자 학번/이름을 모두 입력해주세요.");
+        setLoading(false);
+        return;
+      }
+
+      // 4) 예약 데이터 저장 (인원 스냅샷 포함)
       const reservationData = {
         studentId: user.isAdmin ? "admin" : user.studentId,
         studentName: user.name || user.displayName || "알 수 없음",
-        wing: selectedWing.name, // 아래 render에서 selectedWing을 {name,...}로 세팅함
+        wing: selectedRoom.wing,
         floor: selectedRoom.floor || "",
-        roomId: selectedRoom.id, // ← 추가
-        roomName: selectedRoom.name, // ← 이름도 보관
-        date: formatDateToYYYYMMDD(selectedDate),
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name,
+        date: dateStr,
         time: selectedTime.id,
         timeRange: selectedTime.time,
         club: club.trim(),
         reason: reason.trim(),
         status: "active",
         createdAt: new Date(),
+
+        // 인원 관련
+        groupSize, // 본인 포함 총 인원
+        additionalCount: groupSize - 1, // 본인 제외 인원
+        participants, // [{studentId, name}]
+        perReservationMin: perMin,
+        capacity, // null이면 무제한
       };
 
       await createReservation(reservationData);
@@ -235,10 +314,22 @@ function Reserve() {
     }
   };
 
-  // ---------- 구역(윙) 선택 ----------
-  const renderWingSelection = () => (
+  // [2] 헬퍼 추가 (컴포넌트 내부 공용 함수 영역)
+  const getPerReservationMin = (room) => {
+    const v = Number(room?.perReservationMin);
+    return Number.isFinite(v) && v > 0 ? v : 1; // 기본 1명 이상
+  };
+
+  const getCapacity = (room) => {
+    if (room?.capacity === "" || room?.capacity == null) return null; // null = 무제한
+    const v = Number(room.capacity);
+    return Number.isFinite(v) && v >= 0 ? v : null;
+  };
+
+  // ---------- 층 선택 ----------
+  const renderFloorSelection = () => (
     <div>
-      <h3 style={{ marginBottom: "1.5rem" }}>예약할 구역을 선택해주세요</h3>
+      <h3 style={{ marginBottom: "1.5rem" }}>예약할 층을 선택해주세요</h3>
       <div
         style={{
           display: "grid",
@@ -246,41 +337,30 @@ function Reserve() {
           gap: "1.5rem",
         }}
       >
-        {roomTree.map((wing) => {
-          const floorsCount = wing.floors.length;
-          const roomsCount = wing.floors.reduce(
-            (acc, f) => acc + f.rooms.length,
-            0
-          );
-          return (
-            <div
-              key={wing.name}
-              // 변경: 윙 카드 클릭 시 step=4로
-              onClick={() => {
-                setSelectedWing(wing); // { name, floors: [...] }
-                setSelectedRoom(null);
-                setStep(4);
-              }}
-              style={{
-                padding: "2rem",
-                border: "1px solid var(--border-color)",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                backgroundColor: "white",
-              }}
-            >
-              <h3
-                style={{ marginBottom: "1rem", color: "var(--primary-color)" }}
-              >
-                {wing.name}
-              </h3>
-              <p style={{ color: "var(--text-color)" }}>
-                {floorsCount}개의 층에 {roomsCount}개의 공간
-              </p>
-            </div>
-          );
-        })}
+        {floorTree.map((floor) => (
+          <div
+            key={floor.name}
+            onClick={() => {
+              setSelectedFloor(floor);
+              setSelectedRoom(null);
+              setStep(4);
+            }}
+            style={{
+              padding: "2rem",
+              border: "1px solid var(--border-color)",
+              borderRadius: 8,
+              cursor: "pointer",
+              background: "white",
+            }}
+          >
+            <h3 style={{ marginBottom: "1rem", color: "var(--primary-color)" }}>
+              {(floor.name || "").replace(/\\/g, "")}
+            </h3>
+            <p style={{ color: "var(--text-color)" }}>
+              {floor.rooms.length}개의 공간
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -300,16 +380,51 @@ function Reserve() {
           res.status === "active"
       );
 
+    // 선택된 층의 모든 방을 윙으로 그룹핑
+    const roomsInFloor = selectedFloor.rooms;
+
+    const byWing = roomsInFloor.reduce((acc, r) => {
+      const wingKey = r.wing ?? "";
+      if (!acc[wingKey]) acc[wingKey] = [];
+      acc[wingKey].push(r);
+      return acc;
+    }, {});
+
+    // 원하는 표시 순서
+    const ZONE_ORDER = ["소그룹 ZONE", "대그룹 ZONE", "별도예약"];
+
+    // byWing 객체 기준으로, 세 ZONE을 고정 순서로 배열화 (없는 ZONE은 빈 배열)
+    const zoneSections = ZONE_ORDER.map((zone) => ({
+      zone,
+      rooms: byWing[zone] || [],
+    }));
+
+    // [3] renderRoomSelection 내부: (선택된 날짜/시간/층 계산 이후) 보조 함수들
+    const getUsedCapacity = (roomId) =>
+      dayReservations
+        .filter(
+          (res) =>
+            res.roomId === roomId &&
+            res.time === selectedTime?.id &&
+            res.status === "active"
+        )
+        .reduce((sum, r) => sum + (Number(r.groupSize) || 1), 0);
+
+    const participantsComplete = areParticipantsComplete(
+      additionalCount,
+      participants
+    );
+
     return (
       <div>
         <h3 style={{ marginBottom: "0.75rem" }}>
-          {selectedWing.name}에서 장소를 선택해주세요
+          {selectedFloor.name}에서 장소를 선택해주세요
         </h3>
+
         <p style={{ marginBottom: "1.5rem", color: "#666" }}>
           선택한 일시: {formatDate(selectedDate)} · {selectedTime?.name} (
           {selectedTime?.time})
         </p>
-
         {error && (
           <div
             style={{
@@ -324,109 +439,171 @@ function Reserve() {
           </div>
         )}
 
-        {selectedWing.floors.map((floor) => (
-          <div key={floor.floor} style={{ marginBottom: "2rem" }}>
-            <h4
-              style={{
-                marginBottom: "1rem",
-                marginTop: "2rem",
-                color: "var(--secondary-color)",
-                borderBottom: "1px solid var(--border-color)",
-                paddingBottom: "0.5rem",
-              }}
-            >
-              {(floor.floor || "").replace(/\\/g, "")}
-            </h4>
-
+        {/* ZONE들을 가로로 3열 배치 */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(280px, 1fr))",
+            gap: "1.5rem",
+            alignItems: "start",
+            marginTop: "0.5rem",
+          }}
+        >
+          {zoneSections.map(({ zone, rooms }) => (
             <div
+              key={zone}
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                gap: "1rem",
+                border: "1px solid var(--border-color)",
+                borderRadius: "8px",
+                padding: "1rem",
+                background: "white",
               }}
             >
-              {floor.rooms.map((room) => {
-                const booked = isRoomBooked(room.id);
-                const blocked =
-                  booked || !room.enabled || (room.teacherOnly && !isAdmin);
+              {/* 섹션 헤더 (ZONE명) */}
+              <h4
+                style={{
+                  marginBottom: "1rem",
+                  color: "var(--secondary-color)",
+                  borderBottom: "1px solid var(--border-color)",
+                  paddingBottom: "0.5rem",
+                  minHeight: "2rem",
+                }}
+              >
+                {(zone || "").replace(/\\/g, "")}
+              </h4>
 
-                const blockMessage = booked
-                  ? "이미 예약됨"
-                  : room.teacherOnly && !isAdmin
-                  ? "*교사만 신청 가능합니다."
-                  : !room.enabled
-                  ? room.disabledReason || "*신청 불가능한 교실입니다."
-                  : "";
-
-                const isSelected = selectedRoom?.id === room.id;
-
-                return (
+              {/* ZONE 내 방 카드들 */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                  gap: "1rem",
+                }}
+              >
+                {rooms.length === 0 ? (
                   <div
-                    key={room.id}
-                    onClick={() => {
-                      if (!blocked) {
-                        setSelectedRoom({ ...room, floor: floor.floor });
-                        setError("");
-                      } else {
-                        setError(blockMessage.replace(/\.$/, ""));
-                      }
-                    }}
                     style={{
-                      padding: "1.5rem",
-                      border: `1px solid ${
-                        isSelected
-                          ? "var(--primary-color)"
-                          : blocked
-                          ? "#e0e0e0"
-                          : "var(--border-color)"
-                      }`,
-                      borderRadius: "8px",
-                      cursor: blocked ? "not-allowed" : "pointer",
-                      transition: "all 0.3s ease",
-                      backgroundColor: blocked
-                        ? "#f5f5f5"
-                        : isSelected
-                        ? "#f0f8ff"
-                        : "white",
-                      opacity: blocked ? 0.6 : 1,
-                      boxShadow: blocked ? "none" : "var(--shadow)",
-                      minHeight: "120px",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
+                      padding: "0.75rem",
+                      border: "1px dashed #ddd",
+                      borderRadius: 8,
+                      color: "#888",
+                      fontSize: "0.9rem",
+                      textAlign: "center",
                     }}
                   >
-                    <div>
-                      <h4 style={{ marginBottom: "0.5rem" }}>
-                        {room.name.replace(/\\/g, "")}
-                      </h4>
-                      <p
-                        style={{
-                          color: "var(--text-color)",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        수용 인원: {room.capacity || "-"}
-                      </p>
-                    </div>
-                    {blocked && (
-                      <p
-                        style={{
-                          color: "#dc3545",
-                          fontSize: "0.85rem",
-                          marginTop: "0.5rem",
-                          fontWeight: "500",
-                        }}
-                      >
-                        {blockMessage}
-                      </p>
-                    )}
+                    등록된 공간이 없습니다.
                   </div>
-                );
-              })}
+                ) : (
+                  rooms.map((room) => {
+                    const cap = getCapacity(room); // 총 정원(null = 무제한)
+                    const used = getUsedCapacity(room.id); // 해당 시간대 사용 중 인원 합계
+                    const atCapacity = cap != null && used >= cap;
+
+                    const blocked =
+                      atCapacity ||
+                      !room.enabled ||
+                      (room.teacherOnly && !isAdmin);
+
+                    const blockMessage = atCapacity
+                      ? "정원이 가득 찼습니다."
+                      : room.teacherOnly && !isAdmin
+                      ? "*교사만 신청 가능합니다."
+                      : !room.enabled
+                      ? room.disabledReason || "*신청 불가능한 교실입니다."
+                      : "";
+
+                    const isSelected = selectedRoom?.id === room.id;
+
+                    return (
+                      <div
+                        key={room.id}
+                        onClick={() => {
+                          if (!blocked) {
+                            setSelectedRoom({
+                              ...room,
+                              floor: selectedFloor.name,
+                              wing: room.wing ?? "",
+                            });
+                            setError("");
+                            // 인원 입력 초기화
+                            setAdditionalCount(0);
+                            setParticipants([]);
+                          } else {
+                            setError(blockMessage.replace(/\.$/, ""));
+                          }
+                        }}
+                        style={{
+                          padding: "1.5rem",
+                          border: `1px solid ${
+                            isSelected
+                              ? "var(--primary-color)"
+                              : blocked
+                              ? "#e0e0e0"
+                              : "var(--border-color)"
+                          }`,
+                          borderRadius: "8px",
+                          cursor: blocked ? "not-allowed" : "pointer",
+                          transition: "all 0.3s ease",
+                          backgroundColor: blocked
+                            ? "#f5f5f5"
+                            : isSelected
+                            ? "#f0f8ff"
+                            : "white",
+                          opacity: blocked ? 0.6 : 1,
+                          boxShadow: blocked ? "none" : "var(--shadow)",
+                          minHeight: "120px",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ marginBottom: "0.5rem" }}>
+                            {room.name.replace(/\\/g, "")}
+                          </h4>
+                          <p
+                            style={{
+                              color: "var(--text-color)",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            수용 인원: {room.capacity || "-"}
+                          </p>
+
+                          <p
+                            style={{
+                              color: "#777",
+                              fontSize: 12,
+                              marginTop: 6,
+                            }}
+                          >
+                            정원 {cap == null ? "무제한" : `${cap}명`} · 사용{" "}
+                            {used}명
+                            {cap != null
+                              ? ` · 잔여 ${Math.max(0, cap - used)}명`
+                              : ""}
+                          </p>
+                        </div>
+                        {blocked && (
+                          <p
+                            style={{
+                              color: "#dc3545",
+                              fontSize: "0.85rem",
+                              marginTop: "0.5rem",
+                              fontWeight: "500",
+                            }}
+                          >
+                            {blockMessage}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
         {/* 선택된 방이 있으면 예약 폼/버튼 노출 */}
         {selectedRoom && (
@@ -479,6 +656,164 @@ function Reserve() {
               ></textarea>
             </div>
 
+            {/* [인원수/참가자 입력] — club / reason 위에 추가 */}
+            {(() => {
+              const minTeam = getPerReservationMin(selectedRoom); // 팀당 최소 인원(본인 포함)
+              const cap = getCapacity(selectedRoom); // 총 정원(null=무제한)
+              const used = (() => {
+                // renderRoomSelection 상단에 있는 getUsedCapacity(roomId) 활용
+                return dayReservations
+                  .filter(
+                    (res) =>
+                      res.roomId === selectedRoom.id &&
+                      res.time === selectedTime?.id &&
+                      res.status === "active"
+                  )
+                  .reduce((sum, r) => sum + (Number(r.groupSize) || 1), 0);
+              })();
+              const remain = cap == null ? null : Math.max(0, cap - used);
+              const myMaxAdditional =
+                remain == null ? 999 : Math.max(0, remain - 1);
+
+              return (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  {/* 규칙 안내 */}
+                  <div
+                    style={{
+                      padding: "0.75rem 1rem",
+                      background: "#f6f9ff",
+                      border: "1px solid #dbe7ff",
+                      borderRadius: 6,
+                      marginBottom: "0.75rem",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <div>
+                      <strong>이용 규칙</strong>
+                    </div>
+                    <div>
+                      • 팀당 최소 인원: <strong>{minTeam}</strong>명
+                    </div>
+                    <div>
+                      • 총 정원:{" "}
+                      <strong>{cap == null ? "무제한" : `${cap}명`}</strong>{" "}
+                      (해당 시간 사용 {used}명
+                      {cap != null ? ` · 잔여 ${remain}명` : ""})
+                    </div>
+                  </div>
+
+                  {/* 본인 제외 인원수 */}
+                  <label
+                    style={{
+                      display: "block",
+                      fontWeight: 500,
+                      marginBottom: 6,
+                    }}
+                  >
+                    본인 제외 인원수
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={myMaxAdditional}
+                    value={additionalCount}
+                    onChange={(e) => {
+                      const v = Math.max(
+                        0,
+                        Math.min(
+                          myMaxAdditional,
+                          parseInt(e.target.value || "0", 10)
+                        )
+                      );
+                      setAdditionalCount(v);
+                      setParticipants((prev) => {
+                        const next = prev.slice(0, v);
+                        while (next.length < v)
+                          next.push({ studentId: "", name: "" });
+                        return next;
+                      });
+                    }}
+                    style={{
+                      width: 120,
+                      padding: "0.6rem",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: 4,
+                    }}
+                  />
+
+                  {/* 참가자(본인 제외) 입력 */}
+                  {participants.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        display: "grid",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      {participants.map((p, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "0.5rem",
+                          }}
+                        >
+                          <div>
+                            <label style={{ fontSize: 13, color: "#666" }}>
+                              {idx + 1}번 학번
+                            </label>
+                            <input
+                              type="text"
+                              value={p.studentId}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setParticipants((prev) => {
+                                  const next = prev.slice();
+                                  next[idx] = { ...next[idx], studentId: val };
+                                  return next;
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "0.6rem",
+                                border: "1px solid var(--border-color)",
+                                borderRadius: 4,
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 13, color: "#666" }}>
+                              {idx + 1}번 이름
+                            </label>
+                            <input
+                              type="text"
+                              value={p.name}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setParticipants((prev) => {
+                                  const next = prev.slice();
+                                  next[idx] = { ...next[idx], name: val };
+                                  return next;
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "0.6rem",
+                                border: "1px solid var(--border-color)",
+                                borderRadius: 4,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <button
               onClick={() => {
                 if (!user) return setError("로그인 후 예약해주세요.");
@@ -486,6 +821,7 @@ function Reserve() {
                   return setError("이용 사유를 입력해주세요.");
                 handleReservation();
               }}
+              disabled={loading || !reason.trim() || !participantsComplete}
               disabled={loading || !reason.trim()}
               style={{
                 width: "100%",
@@ -547,7 +883,7 @@ function Reserve() {
                   if (!isDisabledDate) {
                     setSelectedDate(date);
                     setSelectedTime(null);
-                    setSelectedWing(null);
+                    setSelectedFloor(null);
                     setSelectedRoom(null);
                     setStep(2);
                   }
@@ -633,7 +969,7 @@ function Reserve() {
                 onClick={() => {
                   if (!finalDisabled) {
                     setSelectedTime(slot);
-                    setSelectedWing(null);
+                    setSelectedFloor(null);
                     setSelectedRoom(null);
                     setStep(3);
                     setError("");
@@ -728,7 +1064,7 @@ function Reserve() {
                 resetError();
                 setSelectedDate(null);
                 setSelectedTime(null);
-                setSelectedWing(null);
+                setSelectedFloor(null);
                 setSelectedRoom(null);
                 setWeekReservations({});
                 setClub("");
@@ -745,7 +1081,7 @@ function Reserve() {
                 if (step >= 2) {
                   resetError();
                   setSelectedTime(null);
-                  setSelectedWing(null);
+                  setSelectedFloor(null);
                   setSelectedRoom(null);
                   setClub("");
                   setReason("");
@@ -761,13 +1097,13 @@ function Reserve() {
               onClick={() => {
                 if (step >= 3) {
                   resetError();
-                  setSelectedWing(null);
+                  setSelectedFloor(null);
                   setSelectedRoom(null);
                   setStep(3);
                 }
               }}
             >
-              3. 구역 선택
+              3. 층 선택
             </div>
 
             <div
@@ -814,11 +1150,11 @@ function Reserve() {
       >
         {step === 1 && renderDateSelection()}
         {step === 2 && selectedDate && renderTimeSelection()}
-        {step === 3 && selectedDate && selectedTime && renderWingSelection()}
+        {step === 3 && selectedDate && selectedTime && renderFloorSelection()}
         {step === 4 &&
           selectedDate &&
           selectedTime &&
-          selectedWing &&
+          selectedFloor &&
           renderRoomSelection()}
         {step > 1 && (
           <button
@@ -828,12 +1164,12 @@ function Reserve() {
               if (step === 2) {
                 // 시간 선택으로 가기 전
                 setSelectedTime(null);
-                setSelectedWing(null);
+                setSelectedFloor(null);
                 setSelectedRoom(null);
                 setStep(1);
               } else if (step === 3) {
-                // 구역 선택으로 가기 전
-                setSelectedWing(null);
+                // 층 선택으로 가기 전
+                setSelectedFloor(null);
                 setSelectedRoom(null);
                 setStep(2);
               } else if (step === 4) {

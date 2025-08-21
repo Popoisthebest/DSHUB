@@ -12,16 +12,6 @@ import {
 import { db } from "../firebase/config";
 import "../styles/common.css";
 
-const maskName = (name) => {
-  if (!name) return "";
-  if (name.length <= 1) return name;
-  if (name.length === 2) return name[0] + "*";
-  const firstChar = name[0];
-  const lastChar = name[name.length - 1];
-  const middleMask = "*".repeat(name.length - 2);
-  return firstChar + middleMask + lastChar;
-};
-
 // 학번을 학년, 반, 번호 형식으로 변환하는 함수
 const formatStudentId = (studentId) => {
   if (!studentId || studentId.length !== 5) return studentId;
@@ -249,7 +239,7 @@ function MyPage() {
                 <div>
                   <h3 style={{ marginBottom: "0.5rem" }}>
                     {reservation.wing} - {reservation.floor} -{" "}
-                    {reservation.room}
+                    {reservation.roomName}
                   </h3>
                   <p
                     style={{

@@ -81,7 +81,7 @@ function Home() {
         </div>
       </div>
 
-      {/* 기능 설명 섹션 */}
+      {/* 이용 안내 섹션 */}
       <div
         style={{
           backgroundColor: "white",
@@ -89,6 +89,108 @@ function Home() {
           borderRadius: "8px",
           boxShadow: "var(--shadow)",
           marginBottom: "2rem",
+        }}
+      >
+        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
+          이용 안내
+        </h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: "2rem",
+          }}
+        >
+          <div>
+            <h3 style={{ marginBottom: "1rem" }}>예약 방법</h3>
+            <ol
+              style={{
+                paddingLeft: "1.5rem",
+                margin: "0",
+                color: "var(--text-color)",
+              }}
+            >
+              <li>원하는 날짜와 시간을 선택합니다.</li>
+              <li>이용할 공간을 선택합니다.</li>
+              <li>이용 사유를 입력합니다.</li>
+              <li>예약을 확정합니다.</li>
+            </ol>
+          </div>
+          <div>
+            <h3 style={{ marginBottom: "1rem" }}>이용 시간</h3>
+            <ul
+              style={{
+                paddingLeft: "1.5rem",
+                margin: "0",
+                color: "var(--text-color)",
+              }}
+            >
+              <li>점심시간: 12:40 ~ 13:30</li>
+              <li>CIP 1: 16:50 ~ 17:40</li>
+              <li>CIP 2: 18:30 ~ 20:00</li>
+              <li>CIP 3: 20:10 ~ 21:00</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginBottom: "1rem" }}>문의하기</h3>
+            <p style={{ margin: "0", color: "var(--text-color)" }}>
+              예약 관련 문의사항은 관리자에게 연락해주세요.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 공지사항 섹션 */}
+      <div
+        style={{
+          backgroundColor: "white",
+          padding: "2rem",
+          borderRadius: "8px",
+          boxShadow: "var(--shadow)",
+          marginBottom: "2rem",
+        }}
+      >
+        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
+          공지사항
+        </h2>
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {notices.length > 0 ? (
+            notices.map((notice) => (
+              <div
+                key={notice.id}
+                style={{
+                  padding: "1rem",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 0.5rem 0" }}>{notice.title}</h3>
+                <p style={{ margin: "0", color: "var(--text-color-light)" }}>
+                  {notice.content}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "1rem",
+                color: "var(--text-color-light)",
+              }}
+            >
+              공지사항이 없습니다.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 기능 설명 섹션 */}
+      <div
+        style={{
+          backgroundColor: "white",
+          padding: "2rem",
+          borderRadius: "8px",
+          boxShadow: "var(--shadow)",
         }}
       >
         <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
@@ -148,108 +250,6 @@ function Home() {
               패드에서도 쉽게 이용할 수 있는 반응형 디자인을 제공합니다.
             </p>
             <div style={{ marginTop: "1rem", fontSize: "2rem" }}>📱</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 공지사항 섹션 */}
-      <div
-        style={{
-          backgroundColor: "white",
-          padding: "2rem",
-          borderRadius: "8px",
-          boxShadow: "var(--shadow)",
-          marginBottom: "2rem",
-        }}
-      >
-        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
-          공지사항
-        </h2>
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {notices.length > 0 ? (
-            notices.map((notice) => (
-              <div
-                key={notice.id}
-                style={{
-                  padding: "1rem",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "4px",
-                }}
-              >
-                <h3 style={{ margin: "0 0 0.5rem 0" }}>{notice.title}</h3>
-                <p style={{ margin: "0", color: "var(--text-color-light)" }}>
-                  {notice.content}
-                </p>
-              </div>
-            ))
-          ) : (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "1rem",
-                color: "var(--text-color-light)",
-              }}
-            >
-              공지사항이 없습니다.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 이용 안내 섹션 */}
-      <div
-        style={{
-          backgroundColor: "white",
-          padding: "2rem",
-          borderRadius: "8px",
-          boxShadow: "var(--shadow)",
-        }}
-      >
-        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
-          이용 안내
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: "2rem",
-          }}
-        >
-          <div>
-            <h3 style={{ marginBottom: "1rem" }}>예약 방법</h3>
-            <ol
-              style={{
-                paddingLeft: "1.5rem",
-                margin: "0",
-                color: "var(--text-color)",
-              }}
-            >
-              <li>원하는 날짜와 시간을 선택합니다.</li>
-              <li>이용할 공간을 선택합니다.</li>
-              <li>이용 사유를 입력합니다.</li>
-              <li>예약을 확정합니다.</li>
-            </ol>
-          </div>
-          <div>
-            <h3 style={{ marginBottom: "1rem" }}>이용 시간</h3>
-            <ul
-              style={{
-                paddingLeft: "1.5rem",
-                margin: "0",
-                color: "var(--text-color)",
-              }}
-            >
-              <li>점심시간: 12:40 ~ 13:30</li>
-              <li>CIP 1: 16:50 ~ 17:40</li>
-              <li>CIP 2: 18:30 ~ 20:00</li>
-              <li>CIP 3: 20:10 ~ 21:00</li>
-            </ul>
-          </div>
-          <div>
-            <h3 style={{ marginBottom: "1rem" }}>문의하기</h3>
-            <p style={{ margin: "0", color: "var(--text-color)" }}>
-              예약 관련 문의사항은 관리자에게 연락해주세요.
-            </p>
           </div>
         </div>
       </div>

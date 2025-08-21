@@ -13,7 +13,6 @@ function InquiryList() {
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [reply, setReply] = useState({});
 
   useEffect(() => {
@@ -54,7 +53,6 @@ function InquiryList() {
       });
 
       setReply((prev) => ({ ...prev, [inquiryId]: "" }));
-      setSelectedInquiry(null);
     } catch (error) {
       console.error("답변 등록 오류:", error);
       setError(error.message);

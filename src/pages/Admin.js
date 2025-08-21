@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import NoticeList from "../components/NoticeList";
 import InquiryList from "../components/InquiryList";
 import ReservationList from "../components/ReservationList";
 import PlaceList from "../components/PlaceList";
-import OneTimePlacesSeeder from "../components/OneTimePlacesSeeder";
 
 function Admin() {
   const { user } = useAuth();

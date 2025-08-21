@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { getAllReservations } from "../firebase/db";
 import { formatDateToYYYYMMDD, formatDate } from "../utils/dateUtils";
 import "../styles/common.css";
@@ -16,7 +15,6 @@ const maskName = (name) => {
 };
 
 function Reservations() {
-  const { user, getUserRoleById } = useAuth(); // getUserRoleById 함수 가져오기
   const [reservations, setReservations] = useState({}); // 날짜별로 그룹화된 예약을 저장
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

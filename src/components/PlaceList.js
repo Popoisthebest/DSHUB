@@ -6,14 +6,14 @@ import {
   deletePlace,
 } from "../firebase/db";
 
-// 프로젝트에서 사용하는 윙 이름 고정 목록(Reserve와 동일하게 맞추기)
-const WINGS = ["LEFT WING", "ORYANG HALL", "RIGHT WING"];
+// 프로젝트에서 사용하는 존 이름 고정 목록(Reserve와 동일하게 맞추기)
+const ZONES = ["소그룹 ZONE", "대그룹 ZONE", "별도예약"];
 
 function PlaceList() {
   // Firestore 원본 리스트
   const [places, setPlaces] = useState([]);
-  // 선택된 윙
-  const [selectedWing, setSelectedWing] = useState(WINGS[0]);
+  // 선택된 존
+  const [selectedZone, setSelectedZone] = useState(ZONES[0]);
   // 모달 상태
   const [editing, setEditing] = useState(null); // 편집 중인 장소(수정 모달)
   const [creating, setCreating] = useState(false); // 추가 모달 on/off
@@ -25,23 +25,23 @@ function PlaceList() {
   }, []);
 
   // 현재 선택 윙에 해당하는 장소 목록(윙 기준만 필터, floor는 무시)
-  const currentWingPlaces = useMemo(() => {
+  const currentZonePlaces = useMemo(() => {
     return places
-      .filter((p) => p.wing === selectedWing)
+      .filter((p) => p.wing === selectedZone)
       .sort(
         (a, b) =>
           (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)
       );
-  }, [places, selectedWing]);
+  }, [places, selectedZone]);
 
   // order 자동 계산(같은 윙 내 마지막 뒤에 붙이기)
   const nextOrder = useMemo(() => {
-    const max = currentWingPlaces.reduce(
+    const max = currentZonePlaces.reduce(
       (m, p) => Math.max(m, p.order ?? 0),
       0
     );
     return (max || 0) + 10;
-  }, [currentWingPlaces]);
+  }, [currentZonePlaces]);
 
   // 장소 삭제
   const handleDelete = async (id) => {
@@ -63,12 +63,18 @@ function PlaceList() {
       disabledReason = "*신청 불가능한 교실입니다.";
     }
 
+    const perMin = Number(form.perReservationMin);
+    const cap = Number(form.capacity);
+
     await upsertPlace({
       id: form.id,
       name: form.name,
-      wing: selectedWing,
+      wing: form.wing || selectedZone,
       floor: form.floor || "", // 층수 저장
-      capacity: form.capacity || "",
+      // 새 규칙 저장: 비어 있으면 ""로 저장(= 제한 없음 처리 가능)
+      perReservationMin: Number.isFinite(perMin) && perMin > 0 ? perMin : "",
+      capacity:
+        form.capacity === "" ? "" : Number.isFinite(cap) && cap >= 0 ? cap : "",
       enabled: !!form.enabled,
       teacherOnly: !!form.teacherOnly,
       order: form.order ?? nextOrder,
@@ -88,10 +94,16 @@ function PlaceList() {
       disabledReason = "*신청 불가능한 교실입니다.";
     }
 
+    const perMin = Number(form.perReservationMin);
+    const cap = Number(form.capacity);
+
     await updatePlace(editing.id, {
       name: form.name,
+      wing: form.wing || selectedZone,
       floor: form.floor || "", // 층수 저장
-      capacity: form.capacity || "",
+      perReservationMin: Number.isFinite(perMin) && perMin > 0 ? perMin : "",
+      capacity:
+        form.capacity === "" ? "" : Number.isFinite(cap) && cap >= 0 ? cap : "",
       enabled: !!form.enabled,
       teacherOnly: !!form.teacherOnly,
       order: form.order ?? 0,
@@ -103,19 +115,19 @@ function PlaceList() {
 
   return (
     <div style={{ padding: "2rem" }}>
-      {/* // 1단계: 윙 선택 */}
+      {/* // 1단계: 날짜 선택 */}
       <h2 style={{ marginBottom: "1rem" }}>장소 관리</h2>
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        {WINGS.map((w) => (
+        {ZONES.map((w) => (
           <button
             key={w}
-            onClick={() => setSelectedWing(w)}
+            onClick={() => setSelectedZone(w)}
             style={{
               padding: "0.6rem 1rem",
               borderRadius: 6,
               border: "1px solid var(--border-color)",
-              background: selectedWing === w ? "var(--primary-color)" : "#fff",
-              color: selectedWing === w ? "#fff" : "var(--text-color)",
+              background: selectedZone === w ? "var(--primary-color)" : "#fff",
+              color: selectedZone === w ? "#fff" : "var(--text-color)",
               cursor: "pointer",
             }}
           >
@@ -138,7 +150,7 @@ function PlaceList() {
         </button>
       </div>
 
-      {/* // 2단계: 장소 카드 목록 (Reserve 느낌) */}
+      {/* // 2단계: 시간 선택 */}
       <div
         style={{
           display: "grid",
@@ -146,7 +158,7 @@ function PlaceList() {
           gap: "1rem",
         }}
       >
-        {currentWingPlaces.map((room) => (
+        {currentZonePlaces.map((room) => (
           <div
             key={room.id}
             style={{
@@ -161,7 +173,22 @@ function PlaceList() {
           >
             <div style={{ fontWeight: 600, marginBottom: 4 }}>{room.name}</div>
             <div style={{ fontSize: 14, color: "var(--text-color)" }}>
-              수용 인원: {room.capacity || "-"}
+              <div style={{ fontSize: 14, color: "var(--text-color)" }}>
+                {(() => {
+                  const minTxt = room.perReservationMin
+                    ? `${room.perReservationMin}명↑`
+                    : "최소무관";
+                  const capTxt =
+                    room.capacity === ""
+                      ? "정원무제한"
+                      : `${room.capacity}명 정원`;
+                  return (
+                    <small style={{ color: "#666" }}>
+                      {minTxt} · {capTxt}
+                    </small>
+                  );
+                })()}
+              </div>
             </div>
             <div
               style={{
@@ -241,6 +268,9 @@ function PlaceList() {
           initial={{
             id: "",
             name: "",
+            wing: selectedZone, // ← 기본 ZONE
+            floor: "", // 층수 기본값
+            perReservationMin: "",
             capacity: "",
             enabled: true,
             teacherOnly: false,
@@ -268,7 +298,7 @@ function PlaceList() {
 // // 간단한 모달 컴포넌트(추가/수정 공용)
 function PlaceModal({ title, initial, onCancel, onSave }) {
   const [form, setForm] = useState(initial);
-  const floorOptions = ["1st FLOOR", "2nd FLOOR", "3rd FLOOR", "4th FLOOR"];
+  const floorOptions = ["1층", "2층", "3층", "4층"];
 
   return (
     <div
@@ -294,7 +324,6 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ marginTop: 0 }}>{title}</h3>
-
         {/* ID */}
         <label style={{ fontSize: 13 }}>ID</label>
         <input
@@ -310,7 +339,6 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             border: "1px solid #ccc",
           }}
         />
-
         {/* 장소명 */}
         <label style={{ fontSize: 13 }}>장소명</label>
         <input
@@ -325,7 +353,6 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             border: "1px solid #ccc",
           }}
         />
-
         {/* 층수 선택 */}
         <label style={{ fontSize: 13 }}>층수</label>
         <select
@@ -346,13 +373,11 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             </option>
           ))}
         </select>
-
-        {/* 수용 인원 */}
-        <label style={{ fontSize: 13 }}>수용 인원</label>
-        <input
-          type="text"
-          value={form.capacity}
-          onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+        {/* ZONE 선택 */}
+        <label style={{ fontSize: 13 }}>ZONE</label>
+        <select
+          value={form.wing || ZONES[0]}
+          onChange={(e) => setForm({ ...form, wing: e.target.value })}
           style={{
             width: "100%",
             padding: 8,
@@ -360,8 +385,107 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             borderRadius: 6,
             border: "1px solid #ccc",
           }}
-        />
+        >
+          {ZONES.map((z) => (
+            <option key={z} value={z}>
+              {z}
+            </option>
+          ))}
+        </select>
 
+        {/* 이용 인원 규칙 */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 8,
+            margin: "4px 0 10px",
+          }}
+        >
+          <div>
+            <label style={{ fontSize: 13 }}>팀당 최소 인원수</label>
+            <input
+              type="number"
+              min={1}
+              value={form.perReservationMin ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  perReservationMin:
+                    e.target.value === ""
+                      ? ""
+                      : Math.max(1, parseInt(e.target.value, 10) || 1),
+                })
+              }
+              placeholder="예: 3"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #ccc",
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 13 }}>수용 가능한 인원수(총 정원)</label>
+            <input
+              type="number"
+              min={0}
+              value={form.capacity ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  // 빈 값("") 허용 → 예약 화면에서 '정원 제한 없음'으로 처리 가능
+                  capacity:
+                    e.target.value === ""
+                      ? ""
+                      : Math.max(0, parseInt(e.target.value, 10) || 0),
+                })
+              }
+              placeholder="예: 45 (비우면 제한 없음)"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #ccc",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 미리보기/가이드 */}
+        {(() => {
+          const minTeam = Number(form.perReservationMin);
+          const cap = Number(form.capacity);
+          const hasMin = Number.isFinite(minTeam) && minTeam > 0;
+          const hasCap = Number.isFinite(cap) && cap >= 0;
+
+          return (
+            <div
+              style={{
+                fontSize: 13,
+                color: "#444",
+                marginBottom: 10,
+                lineHeight: 1.5,
+              }}
+            >
+              <div>
+                • 팀당 최소 인원:{" "}
+                <strong>{hasMin ? `${minTeam}명` : "미설정"}</strong>
+              </div>
+              <div>
+                • 총 정원:{" "}
+                <strong>
+                  {hasCap ? (cap === 0 ? "0명" : `${cap}명`) : "제한 없음"}
+                </strong>
+              </div>
+              <div style={{ color: "#666" }}>
+                ※ 예약 시 요청 인원에 따라 팀 수를 유동적으로 계산(남은 정원
+                내에서 허용).
+              </div>
+            </div>
+          );
+        })()}
         {/* 상태 */}
         <div style={{ display: "flex", gap: 12, margin: "6px 0 10px" }}>
           <label>
@@ -415,7 +539,6 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             border: "1px solid #ccc",
           }}
         />
-
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button
             onClick={onCancel}
