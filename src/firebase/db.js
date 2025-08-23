@@ -309,19 +309,19 @@ export const updateNotice = async (noticeId, updateData) => {
   }
 };
 
-// 사용자 프로필 생성 또는 업데이트
-export const createUserProfile = async (uid, studentId, name) => {
+// 사용자 프로필 생성 또는 업데이트 (role 포함)
+export const createUserProfile = async (uid, { studentId, name, role }) => {
   try {
     await setDoc(
       doc(db, "userProfiles", uid),
       {
-        // userProfiles 컬렉션에 UID를 문서 ID로 사용
-        studentId: studentId,
-        name: name,
+        studentId: studentId ?? null,
+        name: name ?? null,
+        role: role ?? "student", // 역할 저장 (기본: student)
         createdAt: new Date(),
       },
-      { merge: true }
-    ); // 기존 문서가 있으면 업데이트, 없으면 생성
+      { merge: true } // 기존 문서가 있으면 병합
+    );
   } catch (error) {
     throw error;
   }

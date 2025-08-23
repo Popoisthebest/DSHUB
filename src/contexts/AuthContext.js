@@ -5,87 +5,69 @@ import { createUserProfile, getUserProfile } from "../firebase/db";
 
 const AuthContext = createContext(null);
 
-// 임시 선생님 계정
-const TEACHER_ACCOUNT = {
-  id: "admin",
-  password: "1234",
-  name: "관리자",
-  role: "admin",
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      setLoading(true); // 로딩 시작
+      setLoading(true);
 
-      if (firebaseUser) {
-        // Firebase 사용자가 인증됨 (팝업 로그인 또는 영구 세션에서)
-        if (firebaseUser.email && firebaseUser.email.endsWith("@dshs.kr")) {
-          let userRole = "student";
-          if (firebaseUser.email === "admin@dshs.kr") {
-            userRole = "admin";
-          }
-          const userProfile = await getUserProfile(firebaseUser.uid);
+      try {
+        if (!firebaseUser) {
+          setUser(null);
+          localStorage.removeItem("user");
+          return;
+        }
 
-          const appUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            role: userRole,
-            isAdmin: userRole === "admin",
-            studentId: userProfile?.studentId || null,
-            name: userRole === "admin" ? "관리자" : userProfile?.name || null,
-            profileComplete: !!(
-              userProfile &&
-              userProfile.studentId &&
-              userProfile.name
-            ),
-          };
-          setUser(appUser);
-          localStorage.setItem("user", JSON.stringify(appUser));
-          localStorage.removeItem("teacherUser"); // Google 사용자가 로그인하면 선생님 사용자 지우기
-        } else {
-          // @dshs.kr 이메일이 아님, 로그아웃
+        // 도메인 체크
+        if (!(firebaseUser.email && firebaseUser.email.endsWith("@dshs.kr"))) {
           await signOut(auth);
           setUser(null);
           localStorage.removeItem("user");
-          localStorage.removeItem("teacherUser");
           alert("@dshs.kr 도메인 계정만 로그인할 수 있습니다.");
+          return;
         }
-      } else {
-        // Firebase 사용자가 없음 (로그아웃되었거나 로그인 실패/시작되지 않음)
-        // 대체로 localStorage에서 선생님 사용자 확인
-        const savedTeacherUser = localStorage.getItem("teacherUser");
-        if (savedTeacherUser) {
-          const parsedTeacherUser = JSON.parse(savedTeacherUser);
-          setUser(parsedTeacherUser);
-          localStorage.removeItem("user"); // 오래된 Google 로그인 정보 지우기
-        } else {
-          setUser(null);
-          localStorage.removeItem("user");
-          localStorage.removeItem("teacherUser");
-        }
+
+        // 1) Firestore 프로필 먼저 조회 (role 포함)
+        const userProfile = await getUserProfile(firebaseUser.uid); // { studentId, name, role, ... } 예상
+
+        // 2) 역할 결정: 프로필.role > 이메일 기반 추론
+        const derivedFromEmail =
+          firebaseUser.email === "admin@dshs.kr" ? "admin" : "student";
+        const role = userProfile?.role ?? derivedFromEmail;
+        const isAdmin = role === "admin";
+
+        // 3) 앱 상태 구성
+        const appUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          role,
+          isAdmin,
+          studentId: userProfile?.studentId ?? null,
+          name: userProfile?.name ?? (isAdmin ? "관리자" : null),
+          profileComplete: !!(userProfile?.studentId && userProfile?.name),
+        };
+
+        setUser(appUser);
+        localStorage.setItem("user", JSON.stringify(appUser));
+      } finally {
+        setLoading(false);
       }
-      setLoading(false); // 로딩 종료
     });
 
-    return () => {
-      unsubscribe(); // 언마운트 시 리스너 정리
-    };
+    return () => unsubscribe();
   }, []);
 
   const googleLogin = async () => {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider); // Capture result here
-      // onAuthStateChanged will handle setting the user based on 'result.user'
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged에서 user 세팅 처리
     } catch (error) {
       console.error("Google 로그인 오류:", error);
-      // 에러 메시지를 더 구체적으로 제공
       let errorMessage = error.message;
       if (error.code === "auth/popup-blocked") {
         errorMessage =
@@ -94,62 +76,40 @@ export const AuthProvider = ({ children }) => {
         errorMessage = "로그인 팝업이 닫혔습니다.";
       }
       alert(errorMessage);
-      setUser(null); // Ensure user is null on error
+      setUser(null);
       localStorage.removeItem("user");
       setLoading(false);
     }
   };
 
-  const teacherLogin = async (id, password) => {
+  const completeUserProfile = async (studentId, name, overrideRole) => {
     setLoading(true);
     try {
-      if (id === TEACHER_ACCOUNT.id && password === TEACHER_ACCOUNT.password) {
-        const teacherUser = {
-          uid: TEACHER_ACCOUNT.id,
-          email: `${TEACHER_ACCOUNT.id}@dshs.kr`,
-          displayName: TEACHER_ACCOUNT.name,
-          role: TEACHER_ACCOUNT.role,
-          isAdmin: true,
-          profileComplete: true,
-          studentId: "admin",
-        };
-        setUser(teacherUser);
-        localStorage.setItem("teacherUser", JSON.stringify(teacherUser));
-        localStorage.removeItem("user");
-        return teacherUser;
-      } else {
-        throw new Error("선생님 ID 또는 비밀번호가 올바르지 않습니다.");
-      }
-    } catch (error) {
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const completeUserProfile = async (studentId, name) => {
-    setLoading(true);
-    try {
-      if (user && user.uid) {
-        await createUserProfile(user.uid, studentId, name);
-
-        const updatedUserProfile = await getUserProfile(user.uid);
-
-        const updatedUser = {
-          ...user,
-          studentId: updatedUserProfile?.studentId || null,
-          name: updatedUserProfile?.name || null,
-          profileComplete: !!(
-            updatedUserProfile &&
-            updatedUserProfile.studentId &&
-            updatedUserProfile.name
-          ),
-        };
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-      } else {
+      if (!user || !user.uid) {
         throw new Error("사용자 정보가 없습니다.");
       }
+
+      // 저장할 role 결정: 전달값 > 현재 user.role > 기본 student
+      const roleToSave = overrideRole ?? user.role ?? "student";
+
+      // 역할 포함 저장
+      await createUserProfile(user.uid, { studentId, name, role: roleToSave });
+
+      // 최신 프로필 재조회 (role 포함)
+      const updated = await getUserProfile(user.uid);
+
+      const nextRole = updated?.role ?? roleToSave;
+      const updatedUser = {
+        ...user,
+        studentId: updated?.studentId ?? null,
+        name: updated?.name ?? null,
+        role: nextRole,
+        isAdmin: nextRole === "admin",
+        profileComplete: !!(updated?.studentId && updated?.name),
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
     } catch (error) {
       console.error("프로필 저장 오류:", error);
       throw error;
@@ -162,13 +122,11 @@ export const AuthProvider = ({ children }) => {
     await signOut(auth);
     setUser(null);
     localStorage.removeItem("user");
-    localStorage.removeItem("teacherUser"); // 선생님 정보도 로그아웃 시 제거
   };
 
   const value = {
     user,
     googleLogin,
-    teacherLogin,
     logout,
     loading,
     completeUserProfile,
