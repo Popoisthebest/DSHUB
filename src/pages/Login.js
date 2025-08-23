@@ -4,106 +4,70 @@ import { useAuth } from "../contexts/AuthContext";
 import "../styles/common.css";
 
 function Login() {
-  const [studentId, setStudentId] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { googleLogin } = useAuth(); // teacherLogin 제거
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoading(true);
     try {
-      setError("");
-      setLoading(true);
-      await login(studentId, password);
+      await googleLogin();
       navigate("/");
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message || "로그인 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "0 auto", padding: "2rem" }}>
+    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem" }}>
       <div style={{ marginBottom: "2rem", textAlign: "center" }}>
         <h2>로그인</h2>
       </div>
 
+      {error && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            backgroundColor: "#fee",
+            color: "#c00",
+            borderRadius: "4px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* 구글 로그인 박스만 유지 */}
       <div
         style={{
-          backgroundColor: "white",
-          padding: "2rem",
-          borderRadius: "8px",
-          boxShadow: "var(--shadow)",
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        {error && (
-          <div
-            style={{
-              padding: "1rem",
-              marginBottom: "1rem",
-              backgroundColor: "#fee",
-              color: "#c00",
-              borderRadius: "4px",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "0.5rem",
-                fontWeight: "500",
-              }}
-            >
-              학번
-            </label>
-            <input
-              type="text"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.8rem",
-                border: "1px solid var(--border-color)",
-                borderRadius: "4px",
-              }}
-              required
-            />
-          </div>
-
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "0.5rem",
-                fontWeight: "500",
-              }}
-            >
-              생년월일(MMDD)
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.8rem",
-                border: "1px solid var(--border-color)",
-                borderRadius: "4px",
-              }}
-              required
-            />
-          </div>
-
+        <div
+          style={{
+            flex: 1,
+            maxWidth: "420px",
+            backgroundColor: "white",
+            padding: "2rem",
+            borderRadius: "8px",
+            boxShadow: "var(--shadow)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <p style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+            Google 계정으로 로그인합니다.
+          </p>
           <button
-            type="submit"
+            onClick={handleGoogleLogin}
             disabled={loading}
             style={{
               width: "100%",
@@ -116,9 +80,9 @@ function Login() {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "로그인 중..." : "로그인"}
+            {loading ? "로그인 중..." : "Google로 로그인"}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

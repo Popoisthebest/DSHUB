@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import Logo from "./Logo";
 import "../styles/common.css";
@@ -7,10 +7,15 @@ import "../styles/common.css";
 function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("로그아웃 오류:", error);
+    }
   };
 
   return (
@@ -60,8 +65,16 @@ function Header() {
                 to="/"
                 style={{
                   textDecoration: "none",
-                  color: "var(--text-color)",
-                  fontWeight: "500",
+                  color:
+                    location.pathname === "/"
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                  fontWeight: location.pathname === "/" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 홈
@@ -78,8 +91,16 @@ function Header() {
                 }}
                 style={{
                   textDecoration: "none",
-                  color: "var(--text-color)",
-                  fontWeight: "500",
+                  color:
+                    location.pathname === "/reserve"
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                  fontWeight: location.pathname === "/reserve" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/reserve"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 예약하기
@@ -96,13 +117,45 @@ function Header() {
                 }}
                 style={{
                   textDecoration: "none",
-                  color: "var(--text-color)",
-                  fontWeight: "500",
+                  color:
+                    location.pathname === "/reservations"
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                  fontWeight:
+                    location.pathname === "/reservations" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/reservations"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 예약현황
               </Link>
             </li>
+            {!user?.isAdmin && (
+              <li>
+                <Link
+                  to="/inquiry"
+                  style={{
+                    textDecoration: "none",
+                    color:
+                      location.pathname === "/inquiry"
+                        ? "var(--primary-color)"
+                        : "var(--text-color)",
+                    fontWeight:
+                      location.pathname === "/inquiry" ? "700" : "500",
+                    padding: "0.5rem 1rem",
+                    borderBottom:
+                      location.pathname === "/inquiry"
+                        ? "2px solid var(--primary-color)"
+                        : "none",
+                  }}
+                >
+                  문의하기
+                </Link>
+              </li>
+            )}
             <li>
               <Link
                 to="/mypage"
@@ -114,8 +167,16 @@ function Header() {
                 }}
                 style={{
                   textDecoration: "none",
-                  color: "var(--text-color)",
-                  fontWeight: "500",
+                  color:
+                    location.pathname === "/mypage"
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                  fontWeight: location.pathname === "/mypage" ? "700" : "500",
+                  padding: "0.5rem 1rem",
+                  borderBottom:
+                    location.pathname === "/mypage"
+                      ? "2px solid var(--primary-color)"
+                      : "none",
                 }}
               >
                 마이페이지
@@ -127,8 +188,16 @@ function Header() {
                   to="/admin"
                   style={{
                     textDecoration: "none",
-                    color: "var(--primary-color)",
-                    fontWeight: "500",
+                    color:
+                      location.pathname === "/admin"
+                        ? "var(--primary-color)"
+                        : "var(--text-color)",
+                    fontWeight: location.pathname === "/admin" ? "700" : "500",
+                    padding: "0.5rem 1rem",
+                    borderBottom:
+                      location.pathname === "/admin"
+                        ? "2px solid var(--primary-color)"
+                        : "none",
                   }}
                 >
                   관리자

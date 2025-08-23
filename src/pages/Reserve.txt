@@ -1,0 +1,1030 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  createReservation,
+  getAllReservations,
+  getReservationsByDateV2,
+  listenToPlaces,
+} from "../firebase/db";
+import "../styles/common.css";
+import schoolImage from "../assets/school-image.png"; // 학교 지도 이미지 임포트
+
+// 예약 가능한 시간대 (요일별 제한을 위해 hour, minute 정보 추가)
+const TIME_SLOTS = [
+  {
+    id: "lunch",
+    name: "점심시간",
+    time: "12:40 - 13:30",
+    hour: 12,
+    minute: 40,
+  },
+  { id: "cip1", name: "CIP1", time: "16:50 - 17:40", hour: 16, minute: 50 },
+  { id: "cip2", name: "CIP2", time: "18:30 - 20:00", hour: 18, minute: 30 },
+  { id: "cip3", name: "CIP3", time: "20:10 - 21:00", hour: 20, minute: 10 },
+];
+
+function Reserve() {
+  // ---------- 상태 ----------
+  const [step, setStep] = useState(1);
+
+  // Firestore에서 받은 원본 장소 리스트
+  const [places, setPlaces] = useState([]);
+
+  // 윙/층/장소 선택 상태
+  const [selectedWing, setSelectedWing] = useState(null); // { name, floors: [...] } 형태로 맞춰서 세팅
+  const [selectedRoom, setSelectedRoom] = useState(null); // { id, name, capacity, teacherOnly, enabled, floor }
+
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [club, setClub] = useState("");
+  const [reason, setReason] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [weekReservations, setWeekReservations] = useState({});
+  const [loadingWeekReservations, setLoadingWeekReservations] = useState(false);
+
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // ---------- 장소 구독 ----------
+  useEffect(() => {
+    // 모든 장소 실시간 구독 후 상태 저장
+    const unsubscribe = listenToPlaces((items) => {
+      setPlaces(items);
+    });
+    return unsubscribe;
+  }, []);
+
+  // ---------- UI용 트리 구조로 변환 (wing → floors → rooms) ----------
+  const roomTree = useMemo(() => {
+    const list = Array.isArray(places) ? places : [];
+
+    // { [wing]: { name, floors: { [floor]: rooms[] } } }
+    const treeObj = list.reduce((acc, p) => {
+      const wingKey = p.wing ?? "";
+      if (!acc[wingKey]) acc[wingKey] = { name: wingKey, floors: {} };
+
+      const floorKey = p.floor ?? ""; // floor 비어 있을 수 있음
+      if (!acc[wingKey].floors[floorKey]) acc[wingKey].floors[floorKey] = [];
+
+      acc[wingKey].floors[floorKey].push(p);
+      return acc;
+    }, {});
+
+    // floors 객체를 [{ floor, rooms }] 배열로 변환 (활성 우선 정렬)
+    const withArrays = Object.values(treeObj).map((wing) => ({
+      name: wing.name,
+      floors: Object.entries(wing.floors).map(([floor, rooms]) => ({
+        floor,
+        rooms: rooms.slice().sort(
+          (a, b) =>
+            Number(Boolean(b.enabled)) - Number(Boolean(a.enabled)) || // enabled=true 먼저
+            String(a.name ?? "").localeCompare(String(b.name ?? ""))
+        ),
+      })),
+    }));
+
+    return withArrays;
+  }, [places]);
+
+  // ---------- 날짜 포맷/주간생성 유틸(기존 그대로) ----------
+  const formatDateToYYYYMMDD = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Sun..6=Sat
+    const mondayOfCurrentWeek = new Date(today);
+    mondayOfCurrentWeek.setDate(
+      today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+    );
+    mondayOfCurrentWeek.setHours(0, 0, 0, 0);
+    let currentDay = new Date(mondayOfCurrentWeek);
+    for (let i = 0; i < 5; i++) {
+      dates.push(new Date(currentDay));
+      currentDay.setDate(currentDay.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const formatDate = (date) =>
+    date.toLocaleDateString("ko-KR", {
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    });
+
+  // ---------- 주간 예약 데이터 불러오기 (기존 로직 유지) ----------
+  useEffect(() => {
+    const fetchWeekReservations = async () => {
+      if (step === 3 && selectedRoom) {
+        setLoadingWeekReservations(true);
+        try {
+          const availableDates = getAvailableDates();
+          if (!availableDates.length) {
+            setWeekReservations({});
+            setLoadingWeekReservations(false);
+            return;
+          }
+          const startOfWeekStr = formatDateToYYYYMMDD(availableDates[0]);
+          const endOfWeekStr = formatDateToYYYYMMDD(
+            availableDates[availableDates.length - 1]
+          );
+
+          const data = await getAllReservations(startOfWeekStr, endOfWeekStr);
+
+          const grouped = data.reduce((acc, reservation) => {
+            const dateKey = reservation.date;
+            if (!acc[dateKey]) acc[dateKey] = [];
+            acc[dateKey].push(reservation);
+            return acc;
+          }, {});
+          setWeekReservations(grouped);
+        } catch (err) {
+          console.error("주간 예약 데이터 로딩 오류:", err);
+          setError("예약 가능 날짜를 불러오는 중 오류가 발생했습니다.");
+        } finally {
+          setLoadingWeekReservations(false);
+        }
+      } else if (step === 2 || step === 1) {
+        setWeekReservations({});
+      }
+    };
+    fetchWeekReservations();
+  }, [step, selectedRoom]);
+
+  // ---------- 예약 생성 ----------
+  const handleReservation = async () => {
+    if (!user) {
+      setError("로그인 후 예약해주세요.");
+      return;
+    }
+    if (!selectedTime) {
+      setError("예약할 시간을 선택해주세요.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("이용 사유를 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // ✅ roomId 기준으로 중복 체크
+      const existingReservations = await getReservationsByDateV2(
+        formatDateToYYYYMMDD(selectedDate),
+        selectedRoom.id,
+        selectedTime.id
+      );
+
+      const isAlreadyBooked = existingReservations.some(
+        (res) => res.status === "active"
+      );
+      if (isAlreadyBooked) {
+        setError(
+          "선택하신 시간은 이미 예약되었습니다. 다른 시간을 선택해주세요."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // ✅ 예약 문서에 roomId + roomName 둘 다 저장
+      const reservationData = {
+        studentId: user.isAdmin ? "admin" : user.studentId,
+        studentName: user.name || user.displayName || "알 수 없음",
+        wing: selectedWing.name, // 아래 render에서 selectedWing을 {name,...}로 세팅함
+        floor: selectedRoom.floor || "",
+        roomId: selectedRoom.id, // ← 추가
+        roomName: selectedRoom.name, // ← 이름도 보관
+        date: formatDateToYYYYMMDD(selectedDate),
+        time: selectedTime.id,
+        timeRange: selectedTime.time,
+        club: club.trim(),
+        reason: reason.trim(),
+        status: "active",
+        createdAt: new Date(),
+      };
+
+      await createReservation(reservationData);
+      navigate("/reservations", {
+        state: { message: "예약이 완료되었습니다!", type: "success" },
+      });
+    } catch (error) {
+      setError(
+        error.message || "예약 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
+      console.error("예약 오류:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------- 구역(윙) 선택 ----------
+  const renderWingSelection = () => (
+    <div>
+      <h3 style={{ marginBottom: "1.5rem" }}>예약할 구역을 선택해주세요</h3>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "1.5rem",
+        }}
+      >
+        {roomTree.map((wing) => {
+          const floorsCount = wing.floors.length;
+          const roomsCount = wing.floors.reduce(
+            (acc, f) => acc + f.rooms.length,
+            0
+          );
+          return (
+            <div
+              key={wing.name}
+              onClick={() => {
+                setSelectedWing(wing); // { name, floors: [...] }
+                setStep(2);
+              }}
+              style={{
+                padding: "2rem",
+                border: "1px solid var(--border-color)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                backgroundColor: "white",
+              }}
+            >
+              <h3
+                style={{ marginBottom: "1rem", color: "var(--primary-color)" }}
+              >
+                {wing.name}
+              </h3>
+              <p style={{ color: "var(--text-color)" }}>
+                {floorsCount}개의 층에 {roomsCount}개의 공간
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ---------- 장소 선택 (선택한 윙의 floors→rooms) ----------
+  const renderRoomSelection = () => (
+    <div>
+      <h3 style={{ marginBottom: "1.5rem" }}>
+        {selectedWing.name} 에서 예약할 장소를 선택해주세요
+      </h3>
+
+      {error && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            backgroundColor: "#fee",
+            color: "#c00",
+            borderRadius: "4px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {selectedWing.floors.map((floor) => (
+        <div key={floor.floor} style={{ marginBottom: "2rem" }}>
+          <h4
+            style={{
+              marginBottom: "1rem",
+              marginTop: "2rem",
+              color: "var(--secondary-color)",
+              borderBottom: "1px solid var(--border-color)",
+              paddingBottom: "0.5rem",
+            }}
+          >
+            {(floor.floor || "").replace(/\\/g, "")}
+          </h4>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            {floor.rooms.map((room) => {
+              const blocked =
+                !room.enabled || (room.teacherOnly && !user?.isAdmin);
+              const blockMessage =
+                room.teacherOnly && !user?.isAdmin
+                  ? "*교사만 신청 가능합니다."
+                  : !room.enabled
+                  ? room.disabledReason || "*신청 불가능한 교실입니다."
+                  : "";
+
+              return (
+                <div
+                  key={room.id}
+                  onClick={() => {
+                    if (!blocked) {
+                      // floor 정보를 선택된 방에 포함시켜 다음 단계에서 사용
+                      setSelectedRoom({ ...room, floor: floor.floor });
+                      setStep(3);
+                      setError("");
+                    } else {
+                      setError(blockMessage.replace(/\.$/, "")); // 경고 띄우기
+                    }
+                  }}
+                  style={{
+                    padding: "1.5rem",
+                    border: `1px solid ${
+                      blocked ? "#e0e0e0" : "var(--border-color)"
+                    }`,
+                    borderRadius: "8px",
+                    cursor: blocked ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    backgroundColor: blocked ? "#f5f5f5" : "white",
+                    opacity: blocked ? 0.6 : 1,
+                    boxShadow: blocked ? "none" : "var(--shadow)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    minHeight: "120px",
+                    position: "relative",
+                  }}
+                >
+                  <div>
+                    <h4
+                      style={{
+                        marginBottom: "0.5rem",
+                        color: "var(--text-color)",
+                      }}
+                    >
+                      {room.name.replace(/\\/g, "")}
+                    </h4>
+                    <p
+                      style={{ color: "var(--text-color)", fontSize: "0.9rem" }}
+                    >
+                      수용 인원: {room.capacity || "-"}
+                    </p>
+                  </div>
+
+                  {blocked && (
+                    <p
+                      style={{
+                        color: "#dc3545",
+                        fontSize: "0.85rem",
+                        marginTop: "0.5rem",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {blockMessage}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ---------- 날짜 선택 (이미 roomId 기준으로 필터 중: OK) ----------
+  const renderDateSelection = () => {
+    const availableDates = getAvailableDates();
+    return (
+      <div>
+        <h3 style={{ marginBottom: "1.5rem" }}>예약할 날짜를 선택해주세요</h3>
+        {loadingWeekReservations ? (
+          <div style={{ textAlign: "center", padding: "2rem" }}>
+            예약 가능 날짜 확인 중...
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            {availableDates.map((date) => {
+              const dateKey = formatDateToYYYYMMDD(date);
+              const dailyReservations = weekReservations[dateKey] || [];
+              const dayOfWeek = date.getDay();
+
+              let relevantTimeSlots = [];
+              if (dayOfWeek >= 1 && dayOfWeek <= 4)
+                relevantTimeSlots = TIME_SLOTS;
+              else if (dayOfWeek === 5)
+                relevantTimeSlots = TIME_SLOTS.filter(
+                  (slot) => slot.id === "lunch"
+                );
+
+              // ✅ roomId 기준 필터 (이미 기존 코드가 이렇게 되어 있었음)
+              const roomSpecificReservations = dailyReservations.filter(
+                (res) =>
+                  res.roomId === selectedRoom.id && res.status === "active"
+              );
+
+              const allRelevantSlotsBooked =
+                relevantTimeSlots.length > 0 &&
+                relevantTimeSlots.every((slot) =>
+                  roomSpecificReservations.some((res) => res.time === slot.id)
+                );
+
+              const isDisabledDate = allRelevantSlotsBooked;
+
+              return (
+                <div
+                  key={date.toISOString()}
+                  onClick={() => {
+                    if (!isDisabledDate) {
+                      setSelectedDate(date);
+                      setStep(4);
+                    }
+                  }}
+                  style={{
+                    padding: "1.5rem",
+                    border: `1px solid ${
+                      isDisabledDate ? "#c0c0c0" : "var(--border-color)"
+                    }`,
+                    borderRadius: "8px",
+                    cursor: isDisabledDate ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    backgroundColor: isDisabledDate ? "#e0e0e0" : "white",
+                    textAlign: "center",
+                    opacity: isDisabledDate ? 0.7 : 1,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "1.2rem",
+                      fontWeight: "500",
+                      color: isDisabledDate ? "#a0a0a0" : "inherit",
+                    }}
+                  >
+                    {formatDate(date)}
+                  </p>
+                  {isDisabledDate && (
+                    <p
+                      style={{
+                        color: "#dc3545",
+                        fontSize: "0.85rem",
+                        marginTop: "0.5rem",
+                        fontWeight: "500",
+                      }}
+                    >
+                      (예약 불가)
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ---------- 시간 선택 (비교를 roomName → roomId로 수정) ----------
+  const renderTimeSelection = () => {
+    const now = new Date();
+    const isTodaySelected =
+      selectedDate &&
+      formatDateToYYYYMMDD(selectedDate) === formatDateToYYYYMMDD(now);
+
+    const dayOfWeek = selectedDate ? selectedDate.getDay() : -1;
+
+    let filteredTimeSlots = [];
+    if (dayOfWeek >= 1 && dayOfWeek <= 4) filteredTimeSlots = TIME_SLOTS;
+    else if (dayOfWeek === 5)
+      filteredTimeSlots = TIME_SLOTS.filter((s) => s.id === "lunch");
+
+    const dateReservations =
+      weekReservations[formatDateToYYYYMMDD(selectedDate)] || [];
+
+    return (
+      <div>
+        <h3 style={{ marginBottom: "1.5rem" }}>예약할 시간을 선택해주세요</h3>
+        {error && (
+          <div
+            style={{
+              padding: "1rem",
+              marginBottom: "1rem",
+              backgroundColor: "#fee",
+              color: "#c00",
+              borderRadius: "4px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "1rem",
+          }}
+        >
+          {filteredTimeSlots.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "2rem" }}>
+              이 날짜에는 예약 가능한 시간이 없습니다.
+            </div>
+          ) : (
+            filteredTimeSlots.map((slot) => {
+              const slotTime = new Date(selectedDate);
+              slotTime.setHours(slot.hour, slot.minute, 0, 0);
+              const isDisabledByTime = isTodaySelected && slotTime <= now;
+
+              // ✅ roomId로 비교
+              const isBooked = dateReservations.some(
+                (res) =>
+                  res.roomId === selectedRoom.id &&
+                  res.time === slot.id &&
+                  res.status === "active"
+              );
+
+              // Firestore places의 상태로 판단
+              const isDisabledRoom = !selectedRoom.enabled;
+              const isTeacherOnlyRoom = !!selectedRoom.teacherOnly;
+              const isAdmin = !!user?.isAdmin;
+
+              const canReserve =
+                !isDisabledRoom && (!isTeacherOnlyRoom || isAdmin);
+              const finalDisabled = isDisabledByTime || isBooked || !canReserve;
+
+              return (
+                <button
+                  key={slot.id}
+                  onClick={() => {
+                    if (!loading && !finalDisabled) {
+                      setSelectedTime(slot);
+                      setError("");
+                    }
+                  }}
+                  disabled={finalDisabled}
+                  style={{
+                    padding: "1.5rem",
+                    border: `1px solid ${
+                      isBooked
+                        ? "#d0d0d0"
+                        : !canReserve || isDisabledByTime
+                        ? "#c0c0c0"
+                        : selectedTime?.id === slot.id
+                        ? "var(--primary-color)"
+                        : "var(--border-color)"
+                    }`,
+                    borderRadius: "8px",
+                    backgroundColor: isBooked
+                      ? "#f0f0f0"
+                      : !canReserve || isDisabledByTime
+                      ? "#e8e8e8"
+                      : selectedTime?.id === slot.id
+                      ? "var(--primary-color)"
+                      : "white",
+                    color: isBooked
+                      ? "#a0a0a0"
+                      : !canReserve || isDisabledByTime
+                      ? "#707070"
+                      : selectedTime?.id === slot.id
+                      ? "white"
+                      : "var(--text-color)",
+                    cursor: finalDisabled ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    textAlign: "left",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    opacity: finalDisabled ? 0.7 : 1,
+                  }}
+                >
+                  <div>
+                    <h4
+                      style={{
+                        marginBottom: "0.5rem",
+                        color: isBooked
+                          ? "#a0a0a0"
+                          : !canReserve || isDisabledByTime
+                          ? "#707070"
+                          : selectedTime?.id === slot.id
+                          ? "white"
+                          : "var(--text-color)",
+                      }}
+                    >
+                      {slot.name}
+                    </h4>
+                    <p
+                      style={{
+                        color: isBooked
+                          ? "#a0a0a0"
+                          : !canReserve || isDisabledByTime
+                          ? "#707070"
+                          : selectedTime?.id === slot.id
+                          ? "white"
+                          : "var(--text-color)",
+                      }}
+                    >
+                      {slot.time}
+                    </p>
+                  </div>
+                  {isBooked ? (
+                    <span
+                      style={{
+                        backgroundColor: "#e9ecef",
+                        color: "#868e96",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      예약됨
+                    </span>
+                  ) : !canReserve || isDisabledByTime ? (
+                    <span
+                      style={{
+                        backgroundColor: "#e9ecef",
+                        color: "#868e96",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      {isDisabledByTime
+                        ? "시간 초과"
+                        : isDisabledRoom
+                        ? "비활성화"
+                        : isTeacherOnlyRoom
+                        ? "교사 전용"
+                        : "예약 불가"}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        backgroundColor: "#e7f5ff",
+                        color: "#1971c2",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      예약 가능
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label
+            style={{
+              display: "block",
+              marginTop: "2rem",
+              fontWeight: "500",
+            }}
+          >
+            동아리 (선택 사항)
+          </label>
+          <input
+            type="text"
+            value={club}
+            onChange={(e) => setClub(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.8rem",
+              border: "1px solid var(--border-color)",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              fontWeight: "500",
+            }}
+          >
+            이용 사유 (필수)
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows="4"
+            style={{
+              width: "100%",
+              padding: "0.8rem",
+              border: "1px solid var(--border-color)",
+              borderRadius: "4px",
+              resize: "vertical",
+            }}
+            required
+          ></textarea>
+        </div>
+        <button
+          onClick={() => {
+            if (!selectedTime) {
+              setError("예약할 시간을 선택해주세요.");
+              return;
+            }
+            if (!reason.trim()) {
+              setError("이용 사유를 입력해주세요.");
+              return;
+            }
+            handleReservation();
+          }}
+          disabled={loading || !selectedTime || !reason.trim()}
+          style={{
+            width: "100%",
+            padding: "1rem",
+            backgroundColor: "var(--primary-color)",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor:
+              loading || !selectedTime || !reason.trim()
+                ? "not-allowed"
+                : "pointer",
+            opacity: loading || !selectedTime || !reason.trim() ? 0.7 : 1,
+            fontSize: "1.1rem",
+            fontWeight: "500",
+          }}
+        >
+          예약하기
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
+      <h2 style={{ marginBottom: "1.5rem" }}>공간 예약하기</h2>
+
+      <div
+        style={{
+          backgroundColor: "#fff3cd",
+          color: "#856404",
+          padding: "1rem",
+          borderRadius: "8px",
+          marginBottom: "1.5rem",
+          border: "1px solid #ffeeba",
+          fontSize: "0.95rem",
+        }}
+      >
+        <strong>안내:</strong> 취소는 당일 오후 13시 40분까지 가능합니다. 그
+        이후에는 관리자에게 문의해주세요.
+      </div>
+
+      <div style={{ marginBottom: "2rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "2rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor:
+                  step >= 1 ? "var(--primary-color)" : "var(--border-color)",
+                color: "white",
+                borderRadius: "4px",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                setError("");
+                setSelectedWing(null);
+                setSelectedRoom(null);
+                setSelectedDate(null);
+                setSelectedTime(null);
+                setClub("");
+                setReason("");
+                setWeekReservations({});
+                setStep(1);
+              }}
+            >
+              1. 구역 선택
+            </div>
+            <div
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor:
+                  step >= 2 ? "var(--primary-color)" : "var(--border-color)",
+                color: "white",
+                borderRadius: "4px",
+                cursor: step >= 2 ? "pointer" : "not-allowed",
+                opacity: step >= 2 ? 1 : 0.6,
+              }}
+              onClick={() => {
+                if (step >= 2) {
+                  setError("");
+                  setSelectedRoom(null);
+                  setSelectedDate(null);
+                  setSelectedTime(null);
+                  setClub("");
+                  setReason("");
+                  setWeekReservations({});
+                  setStep(2);
+                }
+              }}
+            >
+              2. 장소 선택
+            </div>
+            <div
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor:
+                  step >= 3 ? "var(--primary-color)" : "var(--border-color)",
+                color: "white",
+                borderRadius: "4px",
+                cursor: step >= 3 ? "pointer" : "not-allowed",
+                opacity: step >= 3 ? 1 : 0.6,
+              }}
+              onClick={() => {
+                if (step >= 3) {
+                  setError("");
+                  setSelectedDate(null);
+                  setSelectedTime(null);
+                  setClub("");
+                  setReason("");
+                  setWeekReservations({});
+                  setStep(3);
+                }
+              }}
+            >
+              3. 날짜 선택
+            </div>
+            <div
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor:
+                  step >= 4 ? "var(--primary-color)" : "var(--border-color)",
+                color: "white",
+                borderRadius: "4px",
+                cursor: step >= 4 ? "pointer" : "not-allowed",
+                opacity: step >= 4 ? 1 : 0.6,
+              }}
+              onClick={() => {
+                if (step >= 4) {
+                  setError("");
+                  setSelectedTime(null);
+                  setClub("");
+                  setReason("");
+                  setStep(4);
+                }
+              }}
+            >
+              4. 시간 선택
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsMapModalOpen(true)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "1.2rem",
+              color: "var(--primary-color)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "4px",
+              transition: "background-color 0.3s ease",
+            }}
+          >
+            건물 지도 보기
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          backgroundColor: "white",
+          padding: "2rem",
+          borderRadius: "8px",
+          boxShadow: "var(--shadow)",
+        }}
+      >
+        {step === 1 && renderWingSelection()}
+        {step === 2 && selectedWing && renderRoomSelection()}
+        {step === 3 && selectedWing && selectedRoom && renderDateSelection()}
+        {step === 4 &&
+          selectedWing &&
+          selectedRoom &&
+          selectedDate &&
+          renderTimeSelection()}
+
+        {step > 1 && (
+          <button
+            onClick={() => {
+              setError("");
+              if (step === 2) setSelectedWing(null);
+              else if (step === 3) {
+                setSelectedRoom(null);
+                setWeekReservations({});
+              } else if (step === 4) setSelectedDate(null);
+              setStep(step - 1);
+            }}
+            disabled={loading}
+            style={{
+              marginTop: "2rem",
+              padding: "0.8rem 1.5rem",
+              backgroundColor: "var(--border-color)",
+              color: "var(--text-color)",
+              border: "none",
+              borderRadius: "4px",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            이전 단계
+          </button>
+        )}
+      </div>
+
+      {isMapModalOpen && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <button
+              onClick={() => setIsMapModalOpen(false)}
+              style={closeButtonStyle}
+            >
+              &times;
+            </button>
+            <h3 style={{ marginBottom: "1rem", color: "var(--primary-color)" }}>
+              건물 지도
+            </h3>
+            <img
+              src={schoolImage}
+              alt="학교 지도"
+              style={{
+                maxWidth: "100%",
+                height: "auto",
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 모달 스타일 정의
+const modalOverlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000,
+};
+
+const modalContentStyle = {
+  backgroundColor: "white",
+  padding: "2rem",
+  borderRadius: "8px",
+  boxShadow: "var(--shadow-lg)",
+  maxWidth: "90%",
+  maxHeight: "90%",
+  overflow: "auto",
+  width: "auto", // 이미지 크기에 맞게 조절
+  zIndex: 1001,
+  position: "relative",
+};
+
+const closeButtonStyle = {
+  position: "absolute",
+  top: "1rem",
+  right: "1rem",
+  backgroundColor: "transparent",
+  border: "none",
+  fontSize: "1.5rem",
+  cursor: "pointer",
+  color: "var(--text-color-light)",
+};
+
+export default Reserve;

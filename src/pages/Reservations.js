@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { getAllReservations } from "../firebase/db";
 import { formatDateToYYYYMMDD, formatDate } from "../utils/dateUtils";
 import "../styles/common.css";
@@ -21,15 +20,24 @@ function Reservations() {
   const [error, setError] = useState("");
   const [selectedReservation, setSelectedReservation] = useState(null); // 선택된 예약을 저장
   const [isModalOpen, setIsModalOpen] = useState(false); // 모달 가시성 상태
+  // Reservations.js
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
     const start = new Date(today);
-    // 이번 주 월요일로 설정 (일요일인 경우 6일 전, 다른 요일은 해당 요일의 인덱스만큼 이전)
+
+    // 이번 주 월요일로 이동 (일요일은 6일 전, 그 외는 요일-1 만큼 전)
     start.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    start.setHours(0, 0, 0, 0); // 시간 초기화
+    start.setHours(0, 0, 0, 0);
+
+    // 🔁 토(6) 또는 일(0)이면 기준을 "다음 주 월요일"로 이동
+    if (dayOfWeek === 6 || dayOfWeek === 0) {
+      start.setDate(start.getDate() + 7);
+    }
+
     return start;
   });
+
   const location = useLocation();
   const message = location.state?.message;
   const messageType = location.state?.type;
@@ -287,20 +295,22 @@ function Reservations() {
                           <p
                             style={{
                               margin: "0.2rem 0",
-                              fontSize: "0.8rem",
-                              color: "var(--text-color-light)",
+                              fontSize: "0.9rem",
+                              color: "var(--text-color)",
                             }}
                           >
-                            {maskName(reservation.studentName)}
+                            장소: {reservation.roomName}
                           </p>
                           <p
                             style={{
-                              margin: "0.2rem 0",
-                              fontSize: "0.8rem",
-                              color: "var(--text-color-light)",
+                              color: "var(--text-color)",
+                              marginBottom: "0.5rem",
                             }}
                           >
-                            {reservation.room}
+                            예약자:{" "}
+                            {reservation.studentId === "admin"
+                              ? "관리자"
+                              : maskName(reservation.studentName)}
                           </p>
                         </div>
                       ))}
@@ -364,18 +374,16 @@ function Reservations() {
             </h3>
             <div style={{ lineHeight: "1.8" }}>
               <p>
-                <strong>예약자:</strong> {selectedReservation.studentName}
+                <strong>예약자:</strong>{" "}
+                {selectedReservation.studentId === "admin"
+                  ? "관리자"
+                  : maskName(selectedReservation.studentName)}
               </p>
               <p>
-                <strong>학번:</strong> {selectedReservation.studentId}
+                <strong>장소:</strong> {selectedReservation.roomName}
               </p>
               <p>
-                <strong>장소:</strong> {selectedReservation.wing} -{" "}
-                {selectedReservation.floor} - {selectedReservation.room}
-              </p>
-              <p>
-                <strong>날짜:</strong>{" "}
-                {formatDate(new Date(selectedReservation.date))}
+                <strong>날짜:</strong> {selectedReservation.date}
               </p>
               <p>
                 <strong>시간:</strong>{" "}
@@ -389,27 +397,13 @@ function Reservations() {
                   ? "CIP3"
                   : selectedReservation.timeRange}
               </p>
+              {selectedReservation.club && (
+                <p>
+                  <strong>동아리:</strong> {selectedReservation.club}
+                </p>
+              )}
               <p>
                 <strong>이용 사유:</strong> {selectedReservation.reason}
-              </p>
-              <p>
-                <strong>상태:</strong>{" "}
-                <span
-                  style={{
-                    padding: "0.25rem 0.5rem",
-                    borderRadius: "4px",
-                    backgroundColor:
-                      selectedReservation.status === "active"
-                        ? "#e8f5e9"
-                        : "#ffebee",
-                    color:
-                      selectedReservation.status === "active"
-                        ? "#2e7d32"
-                        : "#c62828",
-                  }}
-                >
-                  {selectedReservation.status === "active" ? "활성" : "취소됨"}
-                </span>
               </p>
             </div>
           </div>

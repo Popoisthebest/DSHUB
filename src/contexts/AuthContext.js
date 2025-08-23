@@ -1,426 +1,135 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
+import { auth } from "../firebase/config";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { createUserProfile, getUserProfile } from "../firebase/db";
 
 const AuthContext = createContext(null);
-
-// 학생 정보 데이터
-const STUDENTS = {
-  20101: { name: "곽시온", birth: "1113", role: "student" },
-  20102: { name: "구홍모", birth: "1211", role: "student" },
-  20103: { name: "권도윤", birth: "0910", role: "student" },
-  20104: { name: "권은찬", birth: "0202", role: "student" },
-  20105: { name: "김동림", birth: "0318", role: "student" },
-  20106: { name: "김준모", birth: "0828", role: "student" },
-  20107: { name: "김지훈", birth: "1129", role: "student" },
-  20108: { name: "김효준", birth: "1115", role: "student" },
-  20109: { name: "류시후", birth: "1209", role: "student" },
-  20110: { name: "박건우", birth: "0102", role: "student" },
-  20111: { name: "박광현", birth: "0516", role: "student" },
-  20112: { name: "박상민", birth: "0212", role: "student" },
-  20113: { name: "방승민", birth: "1124", role: "student" },
-  20114: { name: "백현빈", birth: "0104", role: "student" },
-  20115: { name: "변윤성", birth: "0321", role: "student" },
-  20116: { name: "서현우", birth: "0605", role: "student" },
-  20117: { name: "손준혁", birth: "0816", role: "student" },
-  20118: { name: "신정호", birth: "1002", role: "student" },
-  20119: { name: "신현섭", birth: "0520", role: "student" },
-  20120: { name: "안상진", birth: "1130", role: "student" },
-  20121: { name: "안선우", birth: "0219", role: "student" },
-  20122: { name: "오한음", birth: "1106", role: "student" },
-  20123: { name: "이민성", birth: "1016", role: "student" },
-  20124: { name: "이상후", birth: "1220", role: "student" },
-  20125: { name: "이슬찬", birth: "0329", role: "student" },
-  20126: { name: "이승찬", birth: "0129", role: "student" },
-  20127: { name: "임종혁", birth: "0111", role: "student" },
-  20128: { name: "전예준", birth: "0322", role: "student" },
-  20129: { name: "정준호", birth: "1229", role: "student" },
-  20130: { name: "한준희", birth: "1004", role: "student" },
-  20131: { name: "형민호", birth: "0712", role: "student" },
-  20132: { name: "홍승범", birth: "1115", role: "student" },
-  20133: { name: "홍유찬", birth: "0918", role: "student" },
-  20134: { name: "황진규", birth: "0128", role: "student" },
-  20201: { name: "권우성", birth: "0712", role: "student" },
-  20202: { name: "김권우진", birth: "0319", role: "student" },
-  20203: { name: "김동규", birth: "0801", role: "student" },
-  20204: { name: "김민재", birth: "0127", role: "student" },
-  20205: { name: "김선엽", birth: "1009", role: "student" },
-  20206: { name: "김수연", birth: "0701", role: "student" },
-  20207: { name: "김수호", birth: "0929", role: "student" },
-  20208: { name: "김승연", birth: "0117", role: "student" },
-  20209: { name: "김정원", birth: "0130", role: "student" },
-  20210: { name: "노은호", birth: "1103", role: "student" },
-  20211: { name: "박선우", birth: "0106", role: "student" },
-  20212: { name: "박영근", birth: "0304", role: "student" },
-  20213: { name: "박호연", birth: "0401", role: "student" },
-  20214: { name: "배준서", birth: "1213", role: "student" },
-  20215: { name: "성현우", birth: "0717", role: "student" },
-  20216: { name: "송찬", birth: "0922", role: "student" },
-  20217: { name: "오유찬", birth: "1112", role: "student" },
-  20218: { name: "오지완", birth: "0615", role: "student" },
-  20219: { name: "이기석", birth: "0507", role: "student" },
-  20220: { name: "이동원", birth: "1115", role: "student" },
-  20221: { name: "이준서", birth: "0814", role: "student" },
-  20222: { name: "장민성", birth: "0512", role: "student" },
-  20223: { name: "장민혁", birth: "1120", role: "student" },
-  20224: { name: "장성재", birth: "0222", role: "student" },
-  20225: { name: "장효서", birth: "0531", role: "student" },
-  20226: { name: "정민재", birth: "0320", role: "student" },
-  20227: { name: "정예준", birth: "0911", role: "student" },
-  20228: { name: "정현서", birth: "0326", role: "student" },
-  20229: { name: "조용진", birth: "0729", role: "student" },
-  20230: { name: "진종혁", birth: "0205", role: "student" },
-  20231: { name: "최성관", birth: "0718", role: "student" },
-  20232: { name: "최재호", birth: "0303", role: "student" },
-  20233: { name: "홍승현", birth: "0628", role: "student" },
-  20234: { name: "황성준", birth: "0316", role: "student" },
-  20235: { name: "이지섭", birth: "0916", role: "student" },
-  20301: { name: "강경민", birth: "1202", role: "student" },
-  20302: { name: "권수민", birth: "0402", role: "student" },
-  20303: { name: "김도현", birth: "0107", role: "student" },
-  20304: { name: "김민규", birth: "0823", role: "student" },
-  20305: { name: "김현기", birth: "0924", role: "student" },
-  20306: { name: "나경빈", birth: "0908", role: "student" },
-  20307: { name: "노종원", birth: "0901", role: "student" },
-  20308: { name: "명세민", birth: "0610", role: "student" },
-  20309: { name: "박경호", birth: "0722", role: "student" },
-  20310: { name: "박재효", birth: "0827", role: "student" },
-  20311: { name: "박준성", birth: "1020", role: "student" },
-  20312: { name: "박지우", birth: "1120", role: "student" },
-  20313: { name: "방재웅", birth: "0222", role: "student" },
-  20314: { name: "배찬승", birth: "0726", role: "student" },
-  20315: { name: "백승민", birth: "0111", role: "student" },
-  20316: { name: "서하늘", birth: "1006", role: "student" },
-  20317: { name: "송용선", birth: "1110", role: "student" },
-  20318: { name: "신민재", birth: "0102", role: "student" },
-  20319: { name: "여영재", birth: "0623", role: "student" },
-  20320: { name: "염지호", birth: "1108", role: "student" },
-  20321: { name: "오윤겸", birth: "0301", role: "student" },
-  20322: { name: "오윤우", birth: "1014", role: "student" },
-  20323: { name: "오주혁", birth: "0523", role: "student" },
-  20324: { name: "유준이", birth: "0929", role: "student" },
-  20325: { name: "육정윤", birth: "0625", role: "student" },
-  20326: { name: "이승빈", birth: "1017", role: "student" },
-  20327: { name: "이운호", birth: "0504", role: "student" },
-  20328: { name: "이은섭", birth: "0623", role: "student" },
-  20329: { name: "이진서", birth: "0607", role: "student" },
-  20330: { name: "이현성", birth: "0819", role: "student" },
-  20331: { name: "정승원", birth: "0905", role: "student" },
-  20332: { name: "정의영", birth: "1110", role: "student" },
-  20333: { name: "주하랑", birth: "1229", role: "student" },
-  20334: { name: "홍준명", birth: "0701", role: "student" },
-  20335: { name: "정세진", birth: "0320", role: "student" },
-  20401: { name: "길영하", birth: "1105", role: "student" },
-  20402: { name: "김규민", birth: "0201", role: "student" },
-  20403: { name: "김세현", birth: "1122", role: "student" },
-  20404: { name: "김용현", birth: "0109", role: "student" },
-  20405: { name: "김우진", birth: "0213", role: "student" },
-  20406: { name: "김윤우", birth: "0201", role: "student" },
-  20407: { name: "김진리", birth: "0413", role: "student" },
-  20408: { name: "김효중", birth: "1128", role: "student" },
-  20409: { name: "노현호", birth: "0810", role: "student" },
-  20410: { name: "박지민", birth: "0204", role: "student" },
-  20411: { name: "박지원", birth: "0614", role: "student" },
-  20412: { name: "박태환", birth: "1212", role: "student" },
-  20413: { name: "서은찬", birth: "0223", role: "student" },
-  20414: { name: "신동건", birth: "0501", role: "student" },
-  20415: { name: "심재원", birth: "0911", role: "student" },
-  20416: { name: "양지민", birth: "0214", role: "student" },
-  20417: { name: "윤성원", birth: "0318", role: "student" },
-  20418: { name: "이동엽", birth: "0807", role: "student" },
-  20419: { name: "이승준", birth: "1017", role: "student" },
-  20420: { name: "이연호", birth: "0715", role: "student" },
-  20421: { name: "이영준", birth: "0418", role: "student" },
-  20422: { name: "이윤호", birth: "0617", role: "student" },
-  20423: { name: "이정연", birth: "0612", role: "student" },
-  20424: { name: "이준호", birth: "0826", role: "student" },
-  20425: { name: "이지훈", birth: "0502", role: "student" },
-  20426: { name: "임주형", birth: "0323", role: "student" },
-  20427: { name: "임하성", birth: "0531", role: "student" },
-  20428: { name: "조건우", birth: "0710", role: "student" },
-  20429: { name: "조은호", birth: "1111", role: "student" },
-  20430: { name: "조재현", birth: "0213", role: "student" },
-  20431: { name: "하헌성", birth: "0201", role: "student" },
-  20432: { name: "한일", birth: "0929", role: "student" },
-  20433: { name: "한재혁", birth: "0828", role: "student" },
-  20434: { name: "김민규", birth: "0626", role: "student" },
-  20435: { name: "이승찬", birth: "1025", role: "student" },
-  20501: { name: "고윤성", birth: "0227", role: "student" },
-  20502: { name: "공동현", birth: "0904", role: "student" },
-  20503: { name: "김건영", birth: "0905", role: "student" },
-  20504: { name: "김건환", birth: "0812", role: "student" },
-  20505: { name: "김규린", birth: "0812", role: "student" },
-  20506: { name: "김시호", birth: "0704", role: "student" },
-  20507: { name: "김재진", birth: "0101", role: "student" },
-  20508: { name: "김지섭", birth: "0524", role: "student" },
-  20509: { name: "김태형", birth: "0423", role: "student" },
-  20510: { name: "류제욱", birth: "0920", role: "student" },
-  20511: { name: "박성훈", birth: "1124", role: "student" },
-  20512: { name: "박승준", birth: "0530", role: "student" },
-  20513: { name: "박시후", birth: "0623", role: "student" },
-  20514: { name: "박정주", birth: "1029", role: "student" },
-  20515: { name: "박지우", birth: "1223", role: "student" },
-  20516: { name: "배주환", birth: "0112", role: "student" },
-  20517: { name: "백민결", birth: "1029", role: "student" },
-  20518: { name: "송치완", birth: "0801", role: "student" },
-  20519: { name: "송호근", birth: "0101", role: "student" },
-  20520: { name: "염시준", birth: "0411", role: "student" },
-  20521: { name: "오은찬", birth: "0328", role: "student" },
-  20522: { name: "유재홍", birth: "0000", role: "student" },
-  20523: { name: "윤재형", birth: "0613", role: "student" },
-  20524: { name: "윤준영", birth: "0925", role: "student" },
-  20525: { name: "이건영", birth: "1230", role: "student" },
-  20526: { name: "이오우", birth: "0620", role: "student" },
-  20527: { name: "이장규", birth: "0613", role: "student" },
-  20528: { name: "이주영", birth: "0414", role: "student" },
-  20529: { name: "정진욱", birth: "1004", role: "student" },
-  20530: { name: "정찬민", birth: "0608", role: "student" },
-  20531: { name: "조유건", birth: "0711", role: "student" },
-  20532: { name: "최강인", birth: "0528", role: "student" },
-  20533: { name: "최수호", birth: "0809", role: "student" },
-  20534: { name: "최승헌", birth: "0910", role: "student" },
-  20535: { name: "이창현", birth: "0813", role: "student" },
-  20601: { name: "구승훈", birth: "0729", role: "student" },
-  20602: { name: "김대규", birth: "0823", role: "student" },
-  20603: { name: "김동현", birth: "0910", role: "student" },
-  20604: { name: "김민채", birth: "0812", role: "student" },
-  20605: { name: "김성혁", birth: "0325", role: "student" },
-  20606: { name: "김성현", birth: "0306", role: "student" },
-  20607: { name: "김수완", birth: "1202", role: "student" },
-  20608: { name: "김수은", birth: "0229", role: "student" },
-  20609: { name: "김수환", birth: "0502", role: "student" },
-  20610: { name: "김율", birth: "0224", role: "student" },
-  20611: { name: "김이안", birth: "0520", role: "student" },
-  20612: { name: "김진의", birth: "0108", role: "student" },
-  20613: { name: "김태환", birth: "0503", role: "student" },
-  20614: { name: "김현민", birth: "0618", role: "student" },
-  20615: { name: "김현빈", birth: "0515", role: "student" },
-  20616: { name: "노현수", birth: "0416", role: "student" },
-  20617: { name: "문찬희", birth: "0909", role: "student" },
-  20618: { name: "박시언", birth: "1127", role: "student" },
-  20619: { name: "백승우", birth: "0226", role: "student" },
-  20620: { name: "손민서", birth: "0706", role: "student" },
-  20621: { name: "신의진", birth: "0814", role: "student" },
-  20622: { name: "신인환", birth: "0129", role: "student" },
-  20623: { name: "윤서현", birth: "0925", role: "student" },
-  20624: { name: "윤준서", birth: "0405", role: "student" },
-  20625: { name: "윤준석", birth: "0905", role: "student" },
-  20626: { name: "이사엘", birth: "0324", role: "student" },
-  20627: { name: "이상찬", birth: "0101", role: "student" },
-  20628: { name: "이정현", birth: "0530", role: "student" },
-  20629: { name: "이현서", birth: "0609", role: "student" },
-  20630: { name: "임홍재", birth: "0910", role: "student" },
-  20631: { name: "장세진", birth: "0716", role: "student" },
-  20632: { name: "조문건", birth: "1129", role: "student" },
-  20633: { name: "조성민", birth: "0807", role: "student" },
-  20634: { name: "진강", birth: "0509", role: "student" },
-  20635: { name: "채정현", birth: "0411", role: "student" },
-  20636: { name: "채준병", birth: "0422", role: "student" },
-  20637: { name: "하준석", birth: "0204", role: "student" },
-  20701: { name: "권도연", birth: "0330", role: "student" },
-  20702: { name: "김동현", birth: "1118", role: "student" },
-  20703: { name: "김무결", birth: "0419", role: "student" },
-  20704: { name: "김민준", birth: "0303", role: "student" },
-  20705: { name: "김민호", birth: "1130", role: "student" },
-  20706: { name: "김범서", birth: "0821", role: "student" },
-  20707: { name: "김승현", birth: "0328", role: "student" },
-  20708: { name: "김윤슬", birth: "1203", role: "student" },
-  20709: { name: "김은겸", birth: "0229", role: "student" },
-  20710: { name: "김은찬", birth: "0403", role: "student" },
-  20711: { name: "김재민", birth: "0124", role: "student" },
-  20712: { name: "김지태", birth: "0724", role: "student" },
-  20713: { name: "김태민", birth: "1228", role: "student" },
-  20714: { name: "김현우", birth: "1106", role: "student" },
-  20715: { name: "박성욱", birth: "1018", role: "student" },
-  20716: { name: "배진영", birth: "0805", role: "student" },
-  20717: { name: "송리안", birth: "0530", role: "student" },
-  20718: { name: "송의준", birth: "1006", role: "student" },
-  20719: { name: "신기동", birth: "0615", role: "student" },
-  20720: { name: "양동현", birth: "0710", role: "student" },
-  20721: { name: "오서준", birth: "0819", role: "student" },
-  20722: { name: "윤재성", birth: "0211", role: "student" },
-  20723: { name: "윤재훈", birth: "0201", role: "student" },
-  20724: { name: "이경민", birth: "0119", role: "student" },
-  20725: { name: "이기명", birth: "0213", role: "student" },
-  20726: { name: "이승환", birth: "0129", role: "student" },
-  20727: { name: "이연준", birth: "0819", role: "student" },
-  20728: { name: "이재혁", birth: "0919", role: "student" },
-  20729: { name: "이현재", birth: "0405", role: "student" },
-  20730: { name: "인성영", birth: "0411", role: "student" },
-  20731: { name: "임채민", birth: "1110", role: "student" },
-  20732: { name: "조민준", birth: "0611", role: "student" },
-  20733: { name: "최민호", birth: "1001", role: "student" },
-  20734: { name: "최태양", birth: "0423", role: "student" },
-  20735: { name: "한승주", birth: "0528", role: "student" },
-  20801: { name: "김규래", birth: "0320", role: "student" },
-  20802: { name: "김민채", birth: "0315", role: "student" },
-  20803: { name: "김성연", birth: "0214", role: "student" },
-  20804: { name: "김이찬", birth: "0325", role: "student" },
-  20805: { name: "김재훈", birth: "0319", role: "student" },
-  20806: { name: "김태양", birth: "0510", role: "student" },
-  20807: { name: "나태웅", birth: "1221", role: "student" },
-  20808: { name: "노규래", birth: "0408", role: "student" },
-  20809: { name: "노지민", birth: "0103", role: "student" },
-  20810: { name: "문성윤", birth: "0523", role: "student" },
-  20811: { name: "박찬율", birth: "0321", role: "student" },
-  20812: { name: "박헌주", birth: "1227", role: "student" },
-  20813: { name: "박현우", birth: "0322", role: "student" },
-  20814: { name: "성열호", birth: "0822", role: "student" },
-  20815: { name: "안재민", birth: "1217", role: "student" },
-  20816: { name: "육승하", birth: "0829", role: "student" },
-  20817: { name: "윤여준", birth: "0102", role: "student" },
-  20818: { name: "이성준", birth: "0911", role: "student" },
-  20819: { name: "이우진", birth: "1212", role: "student" },
-  20820: { name: "이준서", birth: "0905", role: "student" },
-  20821: { name: "이지섭", birth: "0214", role: "student" },
-  20822: { name: "이환", birth: "0212", role: "student" },
-  20823: { name: "장근영", birth: "0903", role: "student" },
-  20824: { name: "조승현", birth: "0226", role: "student" },
-  20825: { name: "조용찬", birth: "0728", role: "student" },
-  20826: { name: "조우준", birth: "0229", role: "student" },
-  20827: { name: "지창훈", birth: "0701", role: "student" },
-  20828: { name: "차순오", birth: "0122", role: "student" },
-  20829: { name: "최예준", birth: "0223", role: "student" },
-  20830: { name: "최현준", birth: "1226", role: "student" },
-  20831: { name: "홍동우", birth: "0214", role: "student" },
-  20832: { name: "황수현", birth: "0608", role: "student" },
-  20833: { name: "황현승", birth: "0814", role: "student" },
-  20901: { name: "강한결", birth: "0722", role: "student" },
-  20902: { name: "김민섭", birth: "1013", role: "student" },
-  20903: { name: "김민준", birth: "1218", role: "student" },
-  20904: { name: "김산", birth: "0519", role: "student" },
-  20905: { name: "김재우", birth: "1220", role: "student" },
-  20906: { name: "남영은", birth: "0616", role: "student" },
-  20907: { name: "류의선", birth: "0604", role: "student" },
-  20908: { name: "민석기", birth: "0806", role: "student" },
-  20909: { name: "박건", birth: "0921", role: "student" },
-  20910: { name: "박성민", birth: "1211", role: "student" },
-  20911: { name: "박지훈", birth: "0519", role: "student" },
-  20912: { name: "박휘준", birth: "1125", role: "student" },
-  20913: { name: "백종우", birth: "1119", role: "student" },
-  20914: { name: "성하윤", birth: "0412", role: "student" },
-  20915: { name: "송준우", birth: "0508", role: "student" },
-  20916: { name: "위성규", birth: "0423", role: "student" },
-  20917: { name: "위창준", birth: "1106", role: "student" },
-  20918: { name: "윤승리", birth: "0616", role: "student" },
-  20919: { name: "이서준", birth: "0401", role: "student" },
-  20920: { name: "이소망", birth: "1210", role: "student" },
-  20921: { name: "이수호", birth: "1213", role: "student" },
-  20922: { name: "이은성", birth: "0821", role: "student" },
-  20923: { name: "이재원", birth: "1204", role: "student" },
-  20924: { name: "이종민", birth: "0204", role: "student" },
-  20925: { name: "이준석", birth: "0128", role: "student" },
-  20926: { name: "임현진", birth: "0128", role: "student" },
-  20927: { name: "정민준", birth: "0327", role: "student" },
-  20928: { name: "정승원", birth: "0415", role: "student" },
-  20929: { name: "조상희", birth: "0723", role: "student" },
-  20930: { name: "최민준", birth: "0819", role: "student" },
-  20931: { name: "최지훈", birth: "0621", role: "student" },
-  20932: { name: "하지운", birth: "0308", role: "student" },
-  20933: { name: "황시훈", birth: "0127", role: "student" },
-  20934: { name: "황주영", birth: "0417", role: "student" },
-  20935: { name: "황태풍", birth: "0628", role: "student" },
-  21001: { name: "강윤찬", birth: "0521", role: "student" },
-  21002: { name: "고승한", birth: "0428", role: "student" },
-  21003: { name: "김경석", birth: "0722", role: "student" },
-  21004: { name: "김도현", birth: "1211", role: "student" },
-  21005: { name: "김민성", birth: "0520", role: "student" },
-  21006: { name: "김민찬", birth: "1118", role: "student" },
-  21007: { name: "김서준", birth: "0530", role: "student" },
-  21008: { name: "김선민", birth: "0813", role: "student" },
-  21009: { name: "김시준", birth: "1120", role: "student" },
-  21010: { name: "김재민", birth: "0912", role: "student" },
-  21011: { name: "김해환", birth: "1122", role: "student" },
-  21012: { name: "김현서", birth: "0812", role: "student" },
-  21013: { name: "류시온", birth: "0519", role: "student" },
-  21014: { name: "박경범", birth: "0426", role: "student" },
-  21015: { name: "박종현", birth: "0408", role: "student" },
-  21016: { name: "박준환", birth: "1129", role: "student" },
-  21017: { name: "반주현", birth: "0416", role: "student" },
-  21018: { name: "방민재", birth: "0307", role: "student" },
-  21019: { name: "심성열", birth: "0118", role: "student" },
-  21020: { name: "유은찬", birth: "0714", role: "student" },
-  21021: { name: "이나운", birth: "0211", role: "student" },
-  21022: { name: "이상범", birth: "1022", role: "student" },
-  21023: { name: "이서준", birth: "0223", role: "student" },
-  21024: { name: "이성민", birth: "1017", role: "student" },
-  21025: { name: "이승원", birth: "0722", role: "student" },
-  21026: { name: "이주표", birth: "0201", role: "student" },
-  21027: { name: "이준호", birth: "0702", role: "student" },
-  21028: { name: "장민성", birth: "0426", role: "student" },
-  21029: { name: "장준석", birth: "0329", role: "student" },
-  21030: { name: "전유진", birth: "0210", role: "student" },
-  21031: { name: "조재욱", birth: "0612", role: "student" },
-  21032: { name: "한승우", birth: "1024", role: "student" },
-  21033: { name: "한승원", birth: "0702", role: "student" },
-  21034: { name: "허강현", birth: "0131", role: "student" },
-  21035: { name: "홍우진", birth: "1110", role: "student" },
-};
-
-// 관리자 계정
-const ADMIN = {
-  admin: { password: "1234", role: "admin", name: "관리자" },
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 로컬 스토리지에서 로그인 정보 복원
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser({ ...parsedUser, isAdmin: parsedUser.role === "admin" });
-    }
-    setLoading(false);
-  }, []);
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      setLoading(true);
 
-  const login = (studentId, password) => {
-    return new Promise((resolve, reject) => {
-      // 관리자 로그인 체크
-      if (studentId === "admin") {
-        const adminData = ADMIN[studentId];
-        if (adminData && adminData.password === password) {
-          const user = {
-            studentId,
-            role: adminData.role,
-            name: adminData.name,
-            isAdmin: true,
-          };
-          setUser(user);
-          localStorage.setItem("user", JSON.stringify(user));
-          resolve(user);
+      try {
+        if (!firebaseUser) {
+          setUser(null);
+          localStorage.removeItem("user");
           return;
         }
-      }
 
-      // 학생 로그인 체크
-      const studentData = STUDENTS[studentId];
-      if (studentData && studentData.birth === password) {
-        const user = {
-          studentId,
-          role: studentData.role,
-          name: studentData.name,
-          isAdmin: false,
+        // 도메인 체크
+        if (!(firebaseUser.email && firebaseUser.email.endsWith("@dshs.kr"))) {
+          await signOut(auth);
+          setUser(null);
+          localStorage.removeItem("user");
+          alert("@dshs.kr 도메인 계정만 로그인할 수 있습니다.");
+          return;
+        }
+
+        // 1) Firestore 프로필 먼저 조회 (role 포함)
+        const userProfile = await getUserProfile(firebaseUser.uid); // { studentId, name, role, ... } 예상
+
+        // 2) 역할 결정: 프로필.role > 이메일 기반 추론
+        const derivedFromEmail =
+          firebaseUser.email === "admin@dshs.kr" ? "admin" : "student";
+        const role = userProfile?.role ?? derivedFromEmail;
+        const isAdmin = role === "admin";
+
+        // 3) 앱 상태 구성
+        const appUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          role,
+          isAdmin,
+          studentId: userProfile?.studentId ?? null,
+          name: userProfile?.name ?? (isAdmin ? "관리자" : null),
+          profileComplete: !!(userProfile?.studentId && userProfile?.name),
         };
-        setUser(user);
-        localStorage.setItem("user", JSON.stringify(user));
-        resolve(user);
-      } else {
-        reject(new Error("학번 또는 생년월일이 올바르지 않습니다."));
+
+        setUser(appUser);
+        localStorage.setItem("user", JSON.stringify(appUser));
+      } finally {
+        setLoading(false);
       }
     });
+
+    return () => unsubscribe();
+  }, []);
+
+  const googleLogin = async () => {
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged에서 user 세팅 처리
+    } catch (error) {
+      console.error("Google 로그인 오류:", error);
+      let errorMessage = error.message;
+      if (error.code === "auth/popup-blocked") {
+        errorMessage =
+          "팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.";
+      } else if (error.code === "auth/popup-closed-by-user") {
+        errorMessage = "로그인 팝업이 닫혔습니다.";
+      }
+      alert(errorMessage);
+      setUser(null);
+      localStorage.removeItem("user");
+      setLoading(false);
+    }
   };
 
-  const logout = () => {
+  const completeUserProfile = async (studentId, name, overrideRole) => {
+    setLoading(true);
+    try {
+      if (!user || !user.uid) {
+        throw new Error("사용자 정보가 없습니다.");
+      }
+
+      // 저장할 role 결정: 전달값 > 현재 user.role > 기본 student
+      const roleToSave = overrideRole ?? user.role ?? "student";
+
+      // 역할 포함 저장
+      await createUserProfile(user.uid, { studentId, name, role: roleToSave });
+
+      // 최신 프로필 재조회 (role 포함)
+      const updated = await getUserProfile(user.uid);
+
+      const nextRole = updated?.role ?? roleToSave;
+      const updatedUser = {
+        ...user,
+        studentId: updated?.studentId ?? null,
+        name: updated?.name ?? null,
+        role: nextRole,
+        isAdmin: nextRole === "admin",
+        profileComplete: !!(updated?.studentId && updated?.name),
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+    } catch (error) {
+      console.error("프로필 저장 오류:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
     localStorage.removeItem("user");
   };
 
   const value = {
     user,
-    login,
+    googleLogin,
     logout,
     loading,
+    completeUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

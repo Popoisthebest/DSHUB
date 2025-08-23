@@ -12,7 +12,7 @@ function Logo() {
         letterSpacing: "1px",
       }}
     >
-      DAESHILL
+      DSHUB
     </div>
   );
 }
