@@ -12,8 +12,40 @@ import {
   onSnapshot,
   setDoc,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./config";
+
+// (신규) 예약자 + 동행자를 서브컬렉션으로 저장
+// 경로: reservations/{reservationId}/members
+export const saveReservationMembers = async (
+  reservationId,
+  owner, // { studentId, name }
+  participants = [] // [{ studentId, name }, ...]
+) => {
+  if (!reservationId) throw new Error("reservationId가 없습니다.");
+
+  const batch = writeBatch(db);
+  const membersCol = collection(db, "reservations", reservationId, "members");
+
+  const all = [
+    { ...(owner || {}), role: "owner" },
+    ...participants.map((p) => ({ ...p, role: "member" })),
+  ];
+
+  all.forEach((p) => {
+    const mref = doc(membersCol); // 랜덤 문서 ID
+    batch.set(mref, {
+      studentId: (p.studentId || "").trim(),
+      name: (p.name || "").trim(),
+      role: p.role, // 'owner' | 'member'
+      reservationId,
+      createdAt: serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+};
 
 // 예약 생성
 export const createReservation = async (reservationData) => {

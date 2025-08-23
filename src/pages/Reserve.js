@@ -6,6 +6,7 @@ import {
   getAllReservations,
   getReservationsByDateV2,
   listenToPlaces,
+  saveReservationMembers,
 } from "../firebase/db";
 import "../styles/common.css";
 import schoolImage from "../assets/school-image.png"; // 학교 지도 이미지 임포트
@@ -117,16 +118,23 @@ function Reserve() {
   const getAvailableDates = () => {
     const dates = [];
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0=Sun..6=Sat
-    const mondayOfCurrentWeek = new Date(today);
-    mondayOfCurrentWeek.setDate(
-      today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-    );
-    mondayOfCurrentWeek.setHours(0, 0, 0, 0);
-    let currentDay = new Date(mondayOfCurrentWeek);
+    const day = today.getDay(); // 0=Sun .. 6=Sat
+
+    // 이번 주 월요일 계산
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+    monday.setHours(0, 0, 0, 0);
+
+    // 토(6) 또는 일(0)이라면 기준을 다음 주 월요일로 이동
+    if (day === 6 || day === 0) {
+      monday.setDate(monday.getDate() + 7);
+    }
+
+    // 월~금 5일 반환
     for (let i = 0; i < 5; i++) {
-      dates.push(new Date(currentDay));
-      currentDay.setDate(currentDay.getDate() + 1);
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(d);
     }
     return dates;
   };
@@ -300,7 +308,19 @@ function Reserve() {
         capacity, // null이면 무제한
       };
 
-      await createReservation(reservationData);
+      // (A) 예약 문서 생성 → id 획득
+      const reservationId = await createReservation(reservationData); // ← 기존 await createReservation(...) 대체
+
+      // (B) 멤버 서브컬렉션에 예약자 + 동행자 저장
+      await saveReservationMembers(
+        reservationId,
+        {
+          studentId: user.isAdmin ? "admin" : user.studentId,
+          name: user.name || user.displayName || "알 수 없음",
+        },
+        participants // [{ studentId, name }]
+      );
+
       navigate("/reservations", {
         state: { message: "예약이 완료되었습니다!", type: "success" },
       });
@@ -495,22 +515,43 @@ function Reserve() {
                   </div>
                 ) : (
                   rooms.map((room) => {
-                    const cap = getCapacity(room); // 총 정원(null = 무제한)
-                    const used = getUsedCapacity(room.id); // 해당 시간대 사용 중 인원 합계
-                    const atCapacity = cap != null && used >= cap;
+                    // 총 정원(숫자면 제한, null이면 무제한)과 현재 사용 인원 합계를 계산
+                    const cap = getCapacity(room); // null => 무제한
+                    const used = getUsedCapacity(room.id); // 활성 예약들의 groupSize 합(없으면 1로 가정)
 
-                    const blocked =
-                      atCapacity ||
-                      !room.enabled ||
-                      (room.teacherOnly && !isAdmin);
+                    // "예약 1건이라도 있으면 비활성화"는 '무제한(cap == null)'에만 적용
+                    // '최대 인원(cap 숫자)'이 있는 방은 기존 방식대로 used >= cap 일 때만 비활성화
+                    let blocked, blockMessage;
 
-                    const blockMessage = atCapacity
-                      ? "정원이 가득 찼습니다."
-                      : room.teacherOnly && !isAdmin
-                      ? "*교사만 신청 가능합니다."
-                      : !room.enabled
-                      ? room.disabledReason || "*신청 불가능한 교실입니다."
-                      : "";
+                    if (cap == null) {
+                      // 무제한: 한 팀만 허용 → 사용 인원이 1명 이상이면 이미 사용 중
+                      const inUse = used > 0;
+                      blocked =
+                        inUse ||
+                        !room.enabled ||
+                        (room.teacherOnly && !isAdmin);
+                      blockMessage = inUse
+                        ? "장소가 이미 예약되었습니다."
+                        : room.teacherOnly && !isAdmin
+                        ? "*교사만 신청 가능합니다."
+                        : !room.enabled
+                        ? room.disabledReason || "*신청 불가능한 교실입니다."
+                        : "";
+                    } else {
+                      // 제한 있음: 정원이 찼을 때만 비활성화
+                      const atCapacity = used >= cap;
+                      blocked =
+                        atCapacity ||
+                        !room.enabled ||
+                        (room.teacherOnly && !isAdmin);
+                      blockMessage = atCapacity
+                        ? "정원이 가득 찼습니다."
+                        : room.teacherOnly && !isAdmin
+                        ? "*교사만 신청 가능합니다."
+                        : !room.enabled
+                        ? room.disabledReason || "*신청 불가능한 교실입니다."
+                        : "";
+                    }
 
                     const isSelected = selectedRoom?.id === room.id;
 
@@ -719,13 +760,15 @@ function Reserve() {
                     max={myMaxAdditional}
                     value={additionalCount}
                     onChange={(e) => {
+                      // 입력값에서 앞자리 0 제거
+                      let raw = e.target.value.replace(/^0+(?=\d)/, "");
+                      if (raw === "") raw = "";
+
                       const v = Math.max(
                         0,
-                        Math.min(
-                          myMaxAdditional,
-                          parseInt(e.target.value || "0", 10)
-                        )
+                        Math.min(myMaxAdditional, parseInt(raw, 10))
                       );
+
                       setAdditionalCount(v);
                       setParticipants((prev) => {
                         const next = prev.slice(0, v);
@@ -822,7 +865,6 @@ function Reserve() {
                 handleReservation();
               }}
               disabled={loading || !reason.trim() || !participantsComplete}
-              disabled={loading || !reason.trim()}
               style={{
                 width: "100%",
                 padding: "1rem",

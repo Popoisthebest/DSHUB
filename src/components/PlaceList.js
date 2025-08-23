@@ -49,7 +49,7 @@ function PlaceList() {
     await deletePlace(id);
   };
 
-  // handleCreate, handleUpdate에 floor 저장 추가
+  // handleCreate, handleUpdate에 floor 저장 + perReservationMax 추가
   const handleCreate = async (form) => {
     if (!form.id || !form.name) {
       alert("ID와 장소명을 입력해주세요.");
@@ -64,15 +64,25 @@ function PlaceList() {
     }
 
     const perMin = Number(form.perReservationMin);
+    const perMax = Number(form.perReservationMax);
     const cap = Number(form.capacity);
+
+    const hasMin = Number.isFinite(perMin) && perMin > 0;
+    const hasMax = Number.isFinite(perMax) && perMax > 0;
+
+    if (hasMin && hasMax && perMax < perMin) {
+      alert("팀당 최대 인원수는 최소 인원수 이상이어야 합니다.");
+      return;
+    }
 
     await upsertPlace({
       id: form.id,
       name: form.name,
       wing: form.wing || selectedZone,
       floor: form.floor || "", // 층수 저장
-      // 새 규칙 저장: 비어 있으면 ""로 저장(= 제한 없음 처리 가능)
-      perReservationMin: Number.isFinite(perMin) && perMin > 0 ? perMin : "",
+      // 비어 있으면 ""로 저장(= 제한 없음 처리)
+      perReservationMin: hasMin ? perMin : "",
+      perReservationMax: hasMax ? perMax : "",
       capacity:
         form.capacity === "" ? "" : Number.isFinite(cap) && cap >= 0 ? cap : "",
       enabled: !!form.enabled,
@@ -95,13 +105,23 @@ function PlaceList() {
     }
 
     const perMin = Number(form.perReservationMin);
+    const perMax = Number(form.perReservationMax);
     const cap = Number(form.capacity);
+
+    const hasMin = Number.isFinite(perMin) && perMin > 0;
+    const hasMax = Number.isFinite(perMax) && perMax > 0;
+
+    if (hasMin && hasMax && perMax < perMin) {
+      alert("팀당 최대 인원수는 최소 인원수 이상이어야 합니다.");
+      return;
+    }
 
     await updatePlace(editing.id, {
       name: form.name,
       wing: form.wing || selectedZone,
       floor: form.floor || "", // 층수 저장
-      perReservationMin: Number.isFinite(perMin) && perMin > 0 ? perMin : "",
+      perReservationMin: hasMin ? perMin : "",
+      perReservationMax: hasMax ? perMax : "",
       capacity:
         form.capacity === "" ? "" : Number.isFinite(cap) && cap >= 0 ? cap : "",
       enabled: !!form.enabled,
@@ -178,13 +198,16 @@ function PlaceList() {
                   const minTxt = room.perReservationMin
                     ? `${room.perReservationMin}명↑`
                     : "최소무관";
+                  const maxTxt = room.perReservationMax
+                    ? `${room.perReservationMax}명↓`
+                    : "최대무관";
                   const capTxt =
                     room.capacity === ""
                       ? "정원무제한"
                       : `${room.capacity}명 정원`;
                   return (
                     <small style={{ color: "#666" }}>
-                      {minTxt} · {capTxt}
+                      {minTxt} · {maxTxt} · {capTxt}
                     </small>
                   );
                 })()}
@@ -223,7 +246,7 @@ function PlaceList() {
                 </span>
               )}
               <span style={{ fontSize: 12, color: "#666" }}>
-                order: {room.order ?? 0}
+                호실: {room.order ?? 0}
               </span>
             </div>
 
@@ -271,6 +294,7 @@ function PlaceList() {
             wing: selectedZone, // ← 기본 ZONE
             floor: "", // 층수 기본값
             perReservationMin: "",
+            perReservationMax: "", // NEW
             capacity: "",
             enabled: true,
             teacherOnly: false,
@@ -427,6 +451,30 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             />
           </div>
           <div>
+            <label style={{ fontSize: 13 }}>팀당 최대 인원수</label>
+            <input
+              type="number"
+              min={1}
+              value={form.perReservationMax ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  perReservationMax:
+                    e.target.value === ""
+                      ? ""
+                      : Math.max(1, parseInt(e.target.value, 10) || 1),
+                })
+              }
+              placeholder="예: 6 (비우면 제한 없음)"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #ccc",
+              }}
+            />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
             <label style={{ fontSize: 13 }}>수용 가능한 인원수(총 정원)</label>
             <input
               type="number"
@@ -456,8 +504,10 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
         {/* 미리보기/가이드 */}
         {(() => {
           const minTeam = Number(form.perReservationMin);
+          const maxTeam = Number(form.perReservationMax);
           const cap = Number(form.capacity);
           const hasMin = Number.isFinite(minTeam) && minTeam > 0;
+          const hasMax = Number.isFinite(maxTeam) && maxTeam > 0;
           const hasCap = Number.isFinite(cap) && cap >= 0;
 
           return (
@@ -474,14 +524,18 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
                 <strong>{hasMin ? `${minTeam}명` : "미설정"}</strong>
               </div>
               <div>
+                • 팀당 최대 인원:{" "}
+                <strong>{hasMax ? `${maxTeam}명` : "제한 없음"}</strong>
+              </div>
+              <div>
                 • 총 정원:{" "}
                 <strong>
                   {hasCap ? (cap === 0 ? "0명" : `${cap}명`) : "제한 없음"}
                 </strong>
               </div>
               <div style={{ color: "#666" }}>
-                ※ 예약 시 요청 인원에 따라 팀 수를 유동적으로 계산(남은 정원
-                내에서 허용).
+                ※ 예약 시 팀당 최소/최대 인원 제한과 남은 총 정원을 함께
+                고려합니다.
               </div>
             </div>
           );

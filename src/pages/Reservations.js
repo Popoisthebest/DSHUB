@@ -20,15 +20,24 @@ function Reservations() {
   const [error, setError] = useState("");
   const [selectedReservation, setSelectedReservation] = useState(null); // 선택된 예약을 저장
   const [isModalOpen, setIsModalOpen] = useState(false); // 모달 가시성 상태
+  // Reservations.js
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
     const start = new Date(today);
-    // 이번 주 월요일로 설정 (일요일인 경우 6일 전, 다른 요일은 해당 요일의 인덱스만큼 이전)
+
+    // 이번 주 월요일로 이동 (일요일은 6일 전, 그 외는 요일-1 만큼 전)
     start.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    start.setHours(0, 0, 0, 0); // 시간 초기화
+    start.setHours(0, 0, 0, 0);
+
+    // 🔁 토(6) 또는 일(0)이면 기준을 "다음 주 월요일"로 이동
+    if (dayOfWeek === 6 || dayOfWeek === 0) {
+      start.setDate(start.getDate() + 7);
+    }
+
     return start;
   });
+
   const location = useLocation();
   const message = location.state?.message;
   const messageType = location.state?.type;
