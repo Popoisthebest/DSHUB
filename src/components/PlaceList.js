@@ -579,8 +579,8 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
           }}
         />
 
-        {/* 표시 순서 */}
-        <label style={{ fontSize: 13 }}>표시 순서(order)</label>
+        {/* 호실 */}
+        <label style={{ fontSize: 13 }}>호실</label>
         <input
           type="number"
           value={form.order ?? 0}
