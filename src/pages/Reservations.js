@@ -15,26 +15,24 @@ const maskName = (name) => {
 };
 
 function Reservations() {
-  const [reservations, setReservations] = useState({}); // 날짜별로 그룹화된 예약을 저장
+  const [reservations, setReservations] = useState({}); // 날짜별로 그룹화된 예약
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedReservation, setSelectedReservation] = useState(null); // 선택된 예약을 저장
-  const [isModalOpen, setIsModalOpen] = useState(false); // 모달 가시성 상태
-  // Reservations.js
+  const [selectedReservation, setSelectedReservation] = useState(null); // 선택된 예약
+  const [isModalOpen, setIsModalOpen] = useState(false); // 모달 가시성
+
+  // 주 시작(월요일)
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const dayOfWeek = today.getDay(); // 0=Sun ... 6=Sat
     const start = new Date(today);
-
-    // 이번 주 월요일로 이동 (일요일은 6일 전, 그 외는 요일-1 만큼 전)
     start.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     start.setHours(0, 0, 0, 0);
 
-    // 🔁 토(6) 또는 일(0)이면 기준을 "다음 주 월요일"로 이동
+    // 토(6) 또는 일(0) → 다음 주 월요일로 이동
     if (dayOfWeek === 6 || dayOfWeek === 0) {
       start.setDate(start.getDate() + 7);
     }
-
     return start;
   });
 
@@ -46,6 +44,29 @@ function Reservations() {
     loadReservations();
   }, [currentWeekStart]);
 
+  // 🔒 모달 열렸을 때: 배경 스크롤/터치 차단 + ESC 닫기
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        closeModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isModalOpen]);
+
   const loadReservations = async () => {
     try {
       setLoading(true);
@@ -53,16 +74,14 @@ function Reservations() {
 
       const startOfWeekStr = formatDateToYYYYMMDD(currentWeekStart);
       const endOfWeek = new Date(currentWeekStart);
-      endOfWeek.setDate(currentWeekStart.getDate() + 4); // 월요일부터 금요일까지 5일
+      endOfWeek.setDate(currentWeekStart.getDate() + 4); // 월~금
       const endOfWeekStr = formatDateToYYYYMMDD(endOfWeek);
 
       const data = await getAllReservations(startOfWeekStr, endOfWeekStr);
 
       const groupedReservations = data.reduce((acc, reservation) => {
-        const dateKey = reservation.date; // YYYY-MM-DD 형식
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
-        }
+        const dateKey = reservation.date; // YYYY-MM-DD
+        if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push(reservation);
         return acc;
       }, {});
@@ -79,7 +98,6 @@ function Reservations() {
     const days = [];
     let currentDay = new Date(currentWeekStart);
     for (let i = 0; i < 5; i++) {
-      // 월요일부터 금요일까지 5일
       days.push(new Date(currentDay));
       currentDay.setDate(currentDay.getDate() + 1);
     }
@@ -89,12 +107,8 @@ function Reservations() {
   const getWeekRangeString = () => {
     const startOfWeek = new Date(currentWeekStart);
     const endOfWeek = new Date(currentWeekStart);
-    endOfWeek.setDate(currentWeekStart.getDate() + 4); // 월요일부터 금요일까지 5일
-    return `
-      ${formatDate(startOfWeek)} 
-      - 
-      ${formatDate(endOfWeek)}
-    `;
+    endOfWeek.setDate(currentWeekStart.getDate() + 4); // 월~금
+    return `${formatDate(startOfWeek)} - ${formatDate(endOfWeek)}`;
   };
 
   const getDayName = (date) => {
@@ -307,10 +321,7 @@ function Reservations() {
                               marginBottom: "0.5rem",
                             }}
                           >
-                            예약자:{" "}
-                            {reservation.studentId === "admin"
-                              ? "관리자"
-                              : maskName(reservation.studentName)}
+                            예약자: {maskName(reservation.studentName)}
                           </p>
                         </div>
                       ))}
@@ -323,44 +334,25 @@ function Reservations() {
         )}
       </div>
 
+      {/* === 모달 === */}
       {isModalOpen && selectedReservation && (
         <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
+          style={modalOverlayStyle}
+          onClick={closeModal}
+          role="dialog"
+          aria-modal="true"
+          aria-label="예약 상세 정보"
+          tabIndex={-1}
         >
           <div
-            style={{
-              backgroundColor: "white",
-              padding: "2rem",
-              borderRadius: "8px",
-              boxShadow: "var(--shadow)",
-              maxWidth: "500px",
-              width: "90%",
-              position: "relative",
-            }}
+            style={modalContentStyle}
+            onClick={(e) => e.stopPropagation()}
+            role="document"
           >
             <button
               onClick={closeModal}
-              style={{
-                position: "absolute",
-                top: "1rem",
-                right: "1rem",
-                background: "none",
-                border: "none",
-                fontSize: "1.5rem",
-                cursor: "pointer",
-                color: "var(--text-color-light)",
-              }}
+              style={modalCloseButtonStyle}
+              aria-label="닫기"
             >
               &times;
             </button>
@@ -375,9 +367,7 @@ function Reservations() {
             <div style={{ lineHeight: "1.8" }}>
               <p>
                 <strong>예약자:</strong>{" "}
-                {selectedReservation.studentId === "admin"
-                  ? "관리자"
-                  : maskName(selectedReservation.studentName)}
+                {maskName(selectedReservation.studentName)}
               </p>
               <p>
                 <strong>장소:</strong> {selectedReservation.roomName}
@@ -412,5 +402,47 @@ function Reservations() {
     </div>
   );
 }
+
+/* ===== 모달 스타일 공통 ===== */
+const modalOverlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000,
+  // 바운스/백그라운드 스크롤 방지
+  overscrollBehavior: "contain",
+  touchAction: "none",
+};
+
+const modalContentStyle = {
+  backgroundColor: "white",
+  padding: "2rem",
+  borderRadius: "8px",
+  boxShadow: "var(--shadow-lg)",
+  maxWidth: "500px",
+  width: "90%",
+  maxHeight: "90%",
+  overflow: "auto",
+  position: "relative",
+  zIndex: 1001,
+  WebkitOverflowScrolling: "touch",
+};
+
+const modalCloseButtonStyle = {
+  position: "absolute",
+  top: "1rem",
+  right: "1rem",
+  background: "none",
+  border: "none",
+  fontSize: "1.5rem",
+  cursor: "pointer",
+  color: "var(--text-color-light)",
+};
 
 export default Reservations;

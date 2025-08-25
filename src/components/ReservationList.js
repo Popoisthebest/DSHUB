@@ -9,13 +9,14 @@ function ReservationList() {
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterStatus, setFilterStatus] = useState("all");
+
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
 
-  // ▼ 추가: 모달 내 "참여자 목록" 토글 상태
+  // ▼ 모달 내 "참여자 목록" 토글
   const [isMembersOpen, setIsMembersOpen] = useState(false);
 
-  // ▼ 추가: 인원수/명단 유틸
+  // ▼ 인원수/명단 유틸
   const getGroupSize = (res) =>
     Number(res?.groupSize) ||
     1 + (Array.isArray(res?.participants) ? res.participants.length : 0);
@@ -31,6 +32,28 @@ function ReservationList() {
       : [];
     return [owner, ...members];
   };
+
+  // 🔒 모달 열릴 때 배경 스크롤/터치 차단 + ESC로 닫기
+  useEffect(() => {
+    if (!isDetailModalOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") handleCloseDetailModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isDetailModalOpen]);
 
   useEffect(() => {
     const startDate = new Date(
@@ -69,7 +92,7 @@ function ReservationList() {
 
   const handleOpenDetailModal = (reservation) => {
     setSelectedReservation(reservation);
-    setIsMembersOpen(false); // ← 열 때 목록은 접힌 상태로
+    setIsMembersOpen(false);
     setIsDetailModalOpen(true);
   };
 
@@ -292,7 +315,7 @@ function ReservationList() {
         </div>
       )}
 
-      {/* ... 상단 컨트롤 / 달력 렌더링 부분은 기존 그대로 ... */}
+      {/* ... 상단 컨트롤 / 달력 렌더링 ... */}
       {Object.keys(reservations).length === 0 ? (
         <div style={{ textAlign: "center", padding: "2rem" }}>
           해당 달의 예약이 없습니다.
@@ -301,49 +324,33 @@ function ReservationList() {
         renderCalendar()
       )}
 
+      {/* === 모달 === */}
       {isDetailModalOpen && selectedReservation && (
         <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 2000,
-          }}
+          style={modalOverlayStyle}
+          onClick={handleCloseDetailModal} // 오버레이 클릭 시 닫기
+          role="dialog"
+          aria-modal="true"
+          aria-label="예약 상세 정보"
+          tabIndex={-1}
         >
           <div
-            style={{
-              backgroundColor: "white",
-              padding: "2rem",
-              borderRadius: "8px",
-              boxShadow: "var(--shadow)",
-              maxWidth: "500px",
-              width: "90%",
-              position: "relative",
-            }}
+            style={modalContentStyle}
+            onClick={(e) => e.stopPropagation()} // 콘텐츠 클릭은 전파 막기
+            role="document"
           >
             <button
               onClick={handleCloseDetailModal}
-              style={{
-                position: "absolute",
-                top: "1rem",
-                right: "1rem",
-                background: "none",
-                border: "none",
-                fontSize: "1.5rem",
-                cursor: "pointer",
-                color: "var(--text-color-light)",
-              }}
+              style={modalCloseButtonStyle}
+              aria-label="닫기"
             >
               &times;
             </button>
             <h3
-              style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}
+              style={{
+                marginBottom: "1.5rem",
+                color: "var(--primary-color)",
+              }}
             >
               예약 상세 정보
             </h3>
@@ -351,6 +358,10 @@ function ReservationList() {
               <p>
                 <strong>예약자:</strong> {selectedReservation.studentName} (
                 {selectedReservation.studentId})
+              </p>
+              <p>
+                <strong>지도교사:</strong>{" "}
+                {selectedReservation.teacherName || "미입력"}
               </p>
               <p>
                 <strong>장소:</strong> {selectedReservation.wing} -{" "}
@@ -372,11 +383,8 @@ function ReservationList() {
                   ? "CIP3"
                   : selectedReservation.timeRange}
               </p>
-              <p>
-                <strong>이용 사유:</strong> {selectedReservation.reason}
-              </p>
 
-              {/* ▼ 추가: 참여 인원 수 + 토글 버튼 */}
+              {/* ▼ 참여 인원/명단 토글 */}
               <div
                 style={{
                   marginTop: "1rem",
@@ -403,7 +411,6 @@ function ReservationList() {
                   {isMembersOpen ? "참여자 목록 접기" : "참여자 목록 보기"}
                 </button>
 
-                {/* ▼ 전체 명단 (예약자 + 동행자) */}
                 {isMembersOpen && (
                   <ul
                     style={{
@@ -494,5 +501,47 @@ function ReservationList() {
     </div>
   );
 }
+
+/* ===== 모달 스타일 공통 ===== */
+const modalOverlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 2000,
+  // 배경 스크롤/바운스 방지
+  overscrollBehavior: "contain",
+  touchAction: "none",
+};
+
+const modalContentStyle = {
+  backgroundColor: "white",
+  padding: "2rem",
+  borderRadius: "8px",
+  boxShadow: "var(--shadow-lg)",
+  maxWidth: "500px",
+  width: "90%",
+  maxHeight: "90%",
+  overflow: "auto",
+  position: "relative",
+  zIndex: 2001,
+  WebkitOverflowScrolling: "touch",
+};
+
+const modalCloseButtonStyle = {
+  position: "absolute",
+  top: "1rem",
+  right: "1rem",
+  background: "none",
+  border: "none",
+  fontSize: "1.5rem",
+  cursor: "pointer",
+  color: "var(--text-color-light)",
+};
 
 export default ReservationList;

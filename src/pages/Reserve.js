@@ -53,8 +53,26 @@ function Reserve() {
   const navigate = useNavigate();
 
   // [1] 상태 추가 (컴포넌트 상단의 useState 구역)
-  const [additionalCount, setAdditionalCount] = useState(0); // 본인 제외 인원수
+  const [additionalCount, setAdditionalCount] = useState(1); // 본인 제외 인원수
   const [participants, setParticipants] = useState([]); // [{studentId, name}]
+
+  // 지도교사 성함 (필수)
+  const [teacherName, setTeacherName] = useState("");
+
+  useEffect(() => {
+    if (!isMapModalOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none"; // 모바일 터치 스크롤 차단
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, [isMapModalOpen]);
 
   // ---------- 장소 구독 ----------
   useEffect(() => {
@@ -64,6 +82,75 @@ function Reserve() {
     });
     return unsubscribe;
   }, []);
+
+  // 선택된 방/시간/날짜 또는 주간예약이 바뀔 때, 인원수/참가자 입력을 안전하게 보정
+  useEffect(() => {
+    if (!selectedRoom || !selectedTime || !selectedDate) return;
+
+    // 날짜 키
+    const dateKey = formatDateToYYYYMMDD(selectedDate);
+    const dayReservations = (weekReservations[dateKey] || []).filter(
+      (res) =>
+        res.status === "active" &&
+        res.time === selectedTime.id &&
+        res.roomId === selectedRoom.id
+    );
+
+    // 현재 사용 인원 합
+    const used = dayReservations.reduce(
+      (sum, r) => sum + (Number(r.groupSize) || 1),
+      0
+    );
+
+    // 정원 계산
+    const cap = getCapacity(selectedRoom); // null => 무제한
+    const remain = cap == null ? null : Math.max(0, cap - used);
+
+    // 본인 제외 가능한 최대치
+    const myMaxAdditional = remain == null ? 999 : Math.max(0, remain - 1);
+
+    // 현재 값이 최대를 넘는 경우 보정
+    setAdditionalCount((prev) => {
+      // 허용 범위 [0, myMaxAdditional] 로 클램프
+      let v = typeof prev === "number" ? prev : parseInt(prev || "0", 10);
+      if (!Number.isFinite(v) || v < 0) v = 0;
+      if (v > myMaxAdditional) v = myMaxAdditional;
+      return v;
+    });
+
+    // participants 배열 길이도 additionalCount에 맞추어 보정
+    setParticipants((prev) => {
+      let v =
+        typeof additionalCount === "number"
+          ? additionalCount
+          : parseInt(additionalCount || "0", 10);
+      if (!Number.isFinite(v) || v < 0) v = 0;
+      if (v > myMaxAdditional) v = myMaxAdditional;
+
+      const next = prev.slice(0, v);
+      while (next.length < v) next.push({ studentId: "", name: "" });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoom, selectedTime, selectedDate, weekReservations]);
+
+  // 문자열/배열 어떤 형태든 태그 배열로 정규화
+  const toTagsArray = (val) => {
+    if (Array.isArray(val)) {
+      return val
+        .map((t) => String(t).trim())
+        .filter(Boolean)
+        .filter((t, i, a) => a.indexOf(t) === i);
+    }
+    if (typeof val === "string") {
+      return val
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .filter((t, i, a) => a.indexOf(t) === i);
+    }
+    return [];
+  };
 
   // 층 정렬용 순위 함수: "1층" → 1, "2층" → 2, 그 외는 맨 뒤로
   const floorRank = (label) => {
@@ -231,6 +318,12 @@ function Reserve() {
       setError("장소를 선택해주세요.");
       return;
     }
+
+    if (!teacherName.trim()) {
+      setError("지도교사 성함을 입력해주세요.");
+      return;
+    }
+
     if (!reason.trim()) {
       setError("이용 사유를 입력해주세요.");
       return;
@@ -296,6 +389,7 @@ function Reserve() {
         time: selectedTime.id,
         timeRange: selectedTime.time,
         club: club.trim(),
+        teacherName: teacherName.trim(), // ✅ 추가
         reason: reason.trim(),
         status: "active",
         createdAt: new Date(),
@@ -377,7 +471,13 @@ function Reserve() {
               {(floor.name || "").replace(/\\/g, "")}
             </h3>
             <p style={{ color: "var(--text-color)" }}>
-              {floor.rooms.length}개의 공간
+              {(() => {
+                const names = floor.rooms.map((room) => room.name);
+                const preview = names.slice(0, 3).join(", "); // 처음 3개만 표시
+                return names.length > 3
+                  ? `${preview} ...`
+                  : preview || "등록된 공간 없음";
+              })()}
             </p>
           </div>
         ))}
@@ -566,9 +666,6 @@ function Reserve() {
                               wing: room.wing ?? "",
                             });
                             setError("");
-                            // 인원 입력 초기화
-                            setAdditionalCount(0);
-                            setParticipants([]);
                           } else {
                             setError(blockMessage.replace(/\.$/, ""));
                           }
@@ -624,6 +721,37 @@ function Reserve() {
                               ? ` · 잔여 ${Math.max(0, cap - used)}명`
                               : ""}
                           </p>
+
+                          {(() => {
+                            const tags = toTagsArray(room.tags);
+                            if (!tags.length) return null;
+                            return (
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  display: "flex",
+                                  gap: "6px",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                {tags.map((t) => (
+                                  <span
+                                    key={t}
+                                    style={{
+                                      fontSize: 11,
+                                      padding: "0.18rem 0.45rem",
+                                      borderRadius: 999,
+                                      background: "#f1f3f5",
+                                      color: "#495057",
+                                      border: "1px solid #e9ecef",
+                                    }}
+                                  >
+                                    #{t}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                         {blocked && (
                           <p
@@ -676,11 +804,37 @@ function Reserve() {
               <label
                 style={{
                   display: "block",
-                  marginBottom: "0.5rem",
+                  marginTop: "0.25rem",
                   fontWeight: "500",
                 }}
               >
-                이용 사유 (필수)
+                지도교사 성함 (해당 장소 사용 허락을 해주신 분){" "}
+                <span style={{ color: "#dc3545" }}>(필수)</span>
+              </label>
+              <input
+                type="text"
+                value={teacherName}
+                onChange={(e) => setTeacherName(e.target.value)}
+                placeholder="예) 김OO"
+                style={{
+                  width: "100%",
+                  padding: "0.8rem",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                }}
+                required
+              />
+            </div>
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginTop: "0.25rem",
+                  fontWeight: "500",
+                }}
+              >
+                이용 사유 <span style={{ color: "#dc3545" }}>(필수)</span>
               </label>
               <textarea
                 value={reason}
@@ -760,14 +914,32 @@ function Reserve() {
                     max={myMaxAdditional}
                     value={additionalCount}
                     onChange={(e) => {
-                      // 입력값에서 앞자리 0 제거
-                      let raw = e.target.value.replace(/^0+(?=\d)/, "");
-                      if (raw === "") raw = "";
+                      let raw = e.target.value;
 
-                      const v = Math.max(
-                        0,
-                        Math.min(myMaxAdditional, parseInt(raw, 10))
-                      );
+                      // 0을 입력했을 때는 강제로 1로 교체
+                      if (raw === "0") {
+                        setAdditionalCount(1);
+                        setParticipants((prev) => {
+                          const next = prev.slice(0, 1);
+                          while (next.length < 1)
+                            next.push({ studentId: "", name: "" });
+                          return next;
+                        });
+                        return;
+                      }
+
+                      // 빈 문자열은 그대로 허용 (지우는 중일 때)
+                      if (raw === "") {
+                        setAdditionalCount("");
+                        setParticipants([]);
+                        return;
+                      }
+
+                      // 숫자 파싱 후 범위 제한
+                      let parsed = parseInt(raw, 10);
+                      if (!Number.isFinite(parsed)) parsed = 1;
+
+                      const v = Math.max(0, Math.min(myMaxAdditional, parsed));
 
                       setAdditionalCount(v);
                       setParticipants((prev) => {
@@ -862,9 +1034,16 @@ function Reserve() {
                 if (!user) return setError("로그인 후 예약해주세요.");
                 if (!reason.trim())
                   return setError("이용 사유를 입력해주세요.");
+                if (!teacherName.trim())
+                  return setError("지도교사 성함을 입력해주세요.");
                 handleReservation();
               }}
-              disabled={loading || !reason.trim() || !participantsComplete}
+              disabled={
+                loading ||
+                !reason.trim() ||
+                !teacherName.trim() ||
+                !participantsComplete
+              }
               style={{
                 width: "100%",
                 padding: "1rem",
@@ -872,8 +1051,12 @@ function Reserve() {
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
-                cursor: loading || !reason.trim() ? "not-allowed" : "pointer",
-                opacity: loading || !reason.trim() ? 0.7 : 1,
+                cursor:
+                  loading || !reason.trim() || !teacherName.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  loading || !reason.trim() || !teacherName.trim() ? 0.7 : 1,
                 fontSize: "1.1rem",
                 fontWeight: "500",
               }}
@@ -1237,11 +1420,22 @@ function Reserve() {
         )}
       </div>
       {isMapModalOpen && (
-        <div style={modalOverlayStyle}>
-          <div style={modalContentStyle}>
+        <div
+          style={modalOverlayStyle}
+          onClick={() => setIsMapModalOpen(false)} // 오버레이 클릭 시 닫기
+          role="dialog"
+          aria-modal="true"
+          aria-label="건물 지도"
+        >
+          <div
+            style={modalContentStyle}
+            onClick={(e) => e.stopPropagation()} // 콘텐츠 클릭은 이벤트 전파 막기
+            role="document"
+          >
             <button
               onClick={() => setIsMapModalOpen(false)}
               style={closeButtonStyle}
+              aria-label="닫기"
             >
               &times;
             </button>
@@ -1277,6 +1471,9 @@ const modalOverlayStyle = {
   justifyContent: "center",
   alignItems: "center",
   zIndex: 1000,
+  // ✨ 추가
+  overscrollBehavior: "contain", // 바운스 방지
+  touchAction: "none", // 터치 제스처 비활성화
 };
 
 const modalContentStyle = {
@@ -1287,9 +1484,11 @@ const modalContentStyle = {
   maxWidth: "90%",
   maxHeight: "90%",
   overflow: "auto",
-  width: "auto", // 이미지 크기에 맞게 조절
+  width: "auto",
   zIndex: 1001,
   position: "relative",
+  // 내부 스크롤은 허용 (이미 overflow:auto)
+  WebkitOverflowScrolling: "touch",
 };
 
 const closeButtonStyle = {

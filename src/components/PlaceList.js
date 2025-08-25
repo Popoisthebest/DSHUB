@@ -9,6 +9,27 @@ import {
 // 프로젝트에서 사용하는 존 이름 고정 목록(Reserve와 동일하게 맞추기)
 const ZONES = ["소그룹 ZONE", "대그룹 ZONE", "별도예약"];
 
+/** 쉼표 구분 문자열 → 고유 태그 배열로 정규화 */
+function parseTags(input) {
+  if (Array.isArray(input))
+    return input
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .filter((t, i, a) => a.indexOf(t) === i);
+  if (typeof input !== "string") return [];
+  return input
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t, i, a) => a.indexOf(t) === i);
+}
+
+/** 태그 배열 → 쉼표 구분 문자열 */
+function tagsToString(tags) {
+  if (!Array.isArray(tags)) return "";
+  return tags.join(", ");
+}
+
 function PlaceList() {
   // Firestore 원본 리스트
   const [places, setPlaces] = useState([]);
@@ -49,7 +70,7 @@ function PlaceList() {
     await deletePlace(id);
   };
 
-  // handleCreate, handleUpdate에 floor 저장 + perReservationMax 추가
+  // handleCreate, handleUpdate에 floor 저장 + perReservationMax + tags 추가
   const handleCreate = async (form) => {
     if (!form.id || !form.name) {
       alert("ID와 장소명을 입력해주세요.");
@@ -89,6 +110,8 @@ function PlaceList() {
       teacherOnly: !!form.teacherOnly,
       order: form.order ?? nextOrder,
       disabledReason,
+      // ✅ 커스텀 태그
+      tags: parseTags(form.tags),
     });
 
     setCreating(false);
@@ -128,6 +151,8 @@ function PlaceList() {
       teacherOnly: !!form.teacherOnly,
       order: form.order ?? 0,
       disabledReason,
+      // ✅ 커스텀 태그
+      tags: parseTags(form.tags),
     });
 
     setEditing(null);
@@ -213,6 +238,8 @@ function PlaceList() {
                 })()}
               </div>
             </div>
+
+            {/* 상태/메타 */}
             <div
               style={{
                 marginTop: 8,
@@ -249,6 +276,34 @@ function PlaceList() {
                 호실: {room.order ?? 0}
               </span>
             </div>
+
+            {/* ✅ 태그 뱃지 */}
+            {!!(room.tags && room.tags.length) && (
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                }}
+              >
+                {room.tags.map((t) => (
+                  <span
+                    key={t}
+                    style={{
+                      fontSize: 11,
+                      padding: "0.18rem 0.45rem",
+                      borderRadius: 999,
+                      background: "#f1f3f5",
+                      color: "#495057",
+                      border: "1px solid #e9ecef",
+                    }}
+                  >
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* // 하단 버튼 */}
             <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
@@ -300,6 +355,7 @@ function PlaceList() {
             teacherOnly: false,
             order: nextOrder,
             disabledReason: "",
+            tags: "", // ← 쉼표 구분 입력 문자열
           }}
           onCancel={() => setCreating(false)}
           onSave={handleCreate} // ← 폼값 직접 전달
@@ -310,7 +366,11 @@ function PlaceList() {
       {editing && (
         <PlaceModal
           title="장소 수정"
-          initial={editing}
+          initial={{
+            ...editing,
+            // 편집 모드에선 배열 → 문자열로 변환해 인풋에 표시
+            tags: tagsToString(editing.tags),
+          }}
           onCancel={() => setEditing(null)}
           onSave={handleUpdate} // ← 폼값 직접 전달
         />
@@ -540,6 +600,7 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             </div>
           );
         })()}
+
         {/* 상태 */}
         <div style={{ display: "flex", gap: 12, margin: "6px 0 10px" }}>
           <label>
@@ -578,6 +639,25 @@ function PlaceModal({ title, initial, onCancel, onSave }) {
             border: "1px solid #ccc",
           }}
         />
+
+        {/* ✅ 태그 입력(쉼표로 구분) */}
+        <label style={{ fontSize: 13 }}>태그 (쉼표로 구분)</label>
+        <input
+          type="text"
+          value={form.tags ?? ""}
+          onChange={(e) => setForm({ ...form, tags: e.target.value })}
+          placeholder="예: 빔프로젝터, 화이트보드, 조용한"
+          style={{
+            width: "100%",
+            padding: 8,
+            margin: "4px 0 10px",
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
+        />
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+          예) <code>빔프로젝터, 화이트보드, 조용한</code> 처럼 입력하세요.
+        </div>
 
         {/* 호실 */}
         <label style={{ fontSize: 13 }}>호실</label>

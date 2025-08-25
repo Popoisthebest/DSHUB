@@ -1,3 +1,4 @@
+// Home.js
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllNotices } from "../firebase/db";
@@ -79,6 +80,21 @@ function Home() {
             예약 현황 보기
           </button>
         </div>
+      </div>
+
+      {/* 경고 박스 */}
+      <div
+        style={{
+          backgroundColor: "#fff3cd",
+          color: "#856404",
+          padding: "1rem",
+          border: "1px solid #ffeeba",
+          borderRadius: "4px",
+          marginBottom: "1.5rem",
+          textAlign: "center",
+        }}
+      >
+        ⚠️ 이 사이트는 <strong>가로 화면</strong> 사용을 권장합니다.
       </div>
 
       {/* 이용 안내 섹션 */}
@@ -203,13 +219,29 @@ function Home() {
             gap: "2rem",
           }}
         >
+          {/* 실시간 예약 카드 (클릭 시 /reserve 이동) */}
           <div
+            onClick={() => navigate("/reserve")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/reserve");
+            }}
             style={{
               padding: "1.5rem",
               border: "1px solid var(--border-color)",
               borderRadius: "8px",
               backgroundColor: "#f8f9fa",
+              cursor: "pointer",
+              outline: "none",
+              transition: "transform 0.06s ease, box-shadow 0.2s ease",
+              boxShadow: "none",
             }}
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "scale(0.99)")
+            }
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
             <h3 style={{ margin: "0 0 1rem 0", color: "var(--primary-color)" }}>
               실시간 예약
@@ -219,13 +251,30 @@ function Home() {
             </p>
             <div style={{ marginTop: "1rem", fontSize: "2rem" }}>🕒</div>
           </div>
+
+          {/* 예약 관리 카드 (클릭 시 /reservations 이동) */}
           <div
+            onClick={() => navigate("/reservations")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") navigate("/reservations");
+            }}
             style={{
               padding: "1.5rem",
               border: "1px solid var(--border-color)",
               borderRadius: "8px",
               backgroundColor: "#f8f9fa",
+              cursor: "pointer",
+              outline: "none",
+              transition: "transform 0.06s ease, box-shadow 0.2s ease",
+              boxShadow: "none",
             }}
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "scale(0.99)")
+            }
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
             <h3 style={{ margin: "0 0 1rem 0", color: "var(--primary-color)" }}>
               예약 관리
@@ -235,6 +284,7 @@ function Home() {
             </p>
             <div style={{ marginTop: "1rem", fontSize: "2rem" }}>📋</div>
           </div>
+
           <div
             style={{
               padding: "1.5rem",
