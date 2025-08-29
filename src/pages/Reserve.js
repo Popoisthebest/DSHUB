@@ -319,6 +319,16 @@ function Reserve() {
       return;
     }
 
+    // ✅ role 기반 교사전용 가드 (추가)
+    const role = user?.role || "student";
+    const isTeacherOrAdmin = role === "teacher" || role === "admin";
+    if (selectedRoom.teacherOnly && !isTeacherOrAdmin) {
+      setError(
+        "해당 공간은 지도교사(또는 지도교사 임장시)/관리자만 신청 가능합니다."
+      );
+      return;
+    }
+
     if (!teacherName.trim()) {
       setError("지도교사 성함을 입력해주세요.");
       return;
@@ -379,7 +389,7 @@ function Reserve() {
 
       // 4) 예약 데이터 저장 (인원 스냅샷 포함)
       const reservationData = {
-        studentId: user.isAdmin ? "admin" : user.studentId,
+        studentId: user?.role === "admin" ? "admin" : user.studentId,
         studentName: user.name || user.displayName || "알 수 없음",
         wing: selectedRoom.wing,
         floor: selectedRoom.floor || "",
@@ -403,13 +413,13 @@ function Reserve() {
       };
 
       // (A) 예약 문서 생성 → id 획득
-      const reservationId = await createReservation(reservationData); // ← 기존 await createReservation(...) 대체
+      const reservationId = await createReservation(reservationData);
 
       // (B) 멤버 서브컬렉션에 예약자 + 동행자 저장
       await saveReservationMembers(
         reservationId,
         {
-          studentId: user.isAdmin ? "admin" : user.studentId,
+          studentId: user?.role === "admin" ? "admin" : user.studentId,
           name: user.name || user.displayName || "알 수 없음",
         },
         participants // [{ studentId, name }]
@@ -489,7 +499,10 @@ function Reserve() {
   const renderRoomSelection = () => {
     const dateKey = selectedDate ? formatDateToYYYYMMDD(selectedDate) : null;
     const dayReservations = (dateKey && weekReservations[dateKey]) || [];
-    const isAdmin = !!user?.isAdmin;
+
+    // ✅ 사용자 role 기반 접근 권한
+    const role = user?.role || "student";
+    const isTeacherOrAdmin = role === "teacher" || role === "admin";
 
     // 헬퍼: 특정 방이 이미 예약됐는지
     const isRoomBooked = (roomId) =>
@@ -545,19 +558,6 @@ function Reserve() {
           선택한 일시: {formatDate(selectedDate)} · {selectedTime?.name} (
           {selectedTime?.time})
         </p>
-        {error && (
-          <div
-            style={{
-              padding: "1rem",
-              marginBottom: "1rem",
-              backgroundColor: "#fee",
-              color: "#c00",
-              borderRadius: "4px",
-            }}
-          >
-            {error}
-          </div>
-        )}
 
         {/* ZONE들을 가로로 3열 배치 */}
         <div
@@ -629,11 +629,11 @@ function Reserve() {
                       blocked =
                         inUse ||
                         !room.enabled ||
-                        (room.teacherOnly && !isAdmin);
+                        (room.teacherOnly && !isTeacherOrAdmin);
                       blockMessage = inUse
                         ? "장소가 이미 예약되었습니다."
-                        : room.teacherOnly && !isAdmin
-                        ? "*교사만 신청 가능합니다."
+                        : room.teacherOnly && !isTeacherOrAdmin
+                        ? "*지도교사 신청 및 지도교사 임장시 사용 가능합니다."
                         : !room.enabled
                         ? room.disabledReason || "*신청 불가능한 교실입니다."
                         : "";
@@ -643,11 +643,11 @@ function Reserve() {
                       blocked =
                         atCapacity ||
                         !room.enabled ||
-                        (room.teacherOnly && !isAdmin);
+                        (room.teacherOnly && !isTeacherOrAdmin);
                       blockMessage = atCapacity
                         ? "정원이 가득 찼습니다."
-                        : room.teacherOnly && !isAdmin
-                        ? "*교사만 신청 가능합니다."
+                        : room.teacherOnly && !isTeacherOrAdmin
+                        ? "*지도교사 신청 및 지도교사 임장시 사용 가능합니다."
                         : !room.enabled
                         ? room.disabledReason || "*신청 불가능한 교실입니다."
                         : "";
@@ -777,7 +777,7 @@ function Reserve() {
         {/* 선택된 방이 있으면 예약 폼/버튼 노출 */}
         {selectedRoom && (
           <div style={{ marginTop: "1.5rem" }}>
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div>
               <label
                 style={{
                   display: "block",
@@ -800,7 +800,7 @@ function Reserve() {
               />
             </div>
 
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div>
               <label
                 style={{
                   display: "block",
@@ -826,7 +826,7 @@ function Reserve() {
               />
             </div>
 
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div>
               <label
                 style={{
                   display: "block",
@@ -1029,6 +1029,21 @@ function Reserve() {
               );
             })()}
 
+            {error && (
+              <div
+                style={{
+                  padding: "1rem",
+                  marginTop: "1rem",
+                  marginBottom: "1rem",
+                  backgroundColor: "#fee",
+                  color: "#c00",
+                  borderRadius: "4px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
             <button
               onClick={() => {
                 if (!user) return setError("로그인 후 예약해주세요.");
@@ -1156,13 +1171,17 @@ function Reserve() {
   };
 
   // 변경: renderTimeSelection (예약됨/방 상태 판단 제거, 클릭 시 step=3로)
+  // 2) 시간 선택
   const renderTimeSelection = () => {
     const now = new Date();
     const isTodaySelected =
       selectedDate &&
       formatDateToYYYYMMDD(selectedDate) === formatDateToYYYYMMDD(now);
 
-    // 요일별 사용 가능한 슬롯
+    // ✅ admin이면 시간 제약 무시
+    const role = user?.role || "student";
+    const isAdmin = role === "admin";
+
     const dayOfWeek = selectedDate ? selectedDate.getDay() : -1;
     let filteredTimeSlots = [];
     if (dayOfWeek >= 1 && dayOfWeek <= 4) filteredTimeSlots = TIME_SLOTS;
@@ -1183,10 +1202,9 @@ function Reserve() {
             const slotTime = new Date(selectedDate);
             slotTime.setHours(slot.hour, slot.minute, 0, 0);
 
-            // 이미 지난 시간(당일만)
-            const isDisabledByTime = isTodaySelected && slotTime <= now; // 지난 시간
-
-            const finalDisabled = isDisabledByTime;
+            const isDisabledByTime = isTodaySelected && slotTime <= now;
+            // ✅ admin이면 지난 시간도 선택 가능
+            const finalDisabled = isDisabledByTime && !isAdmin;
 
             return (
               <button
@@ -1223,16 +1241,12 @@ function Reserve() {
                     : "var(--text-color)",
                   cursor: finalDisabled ? "not-allowed" : "pointer",
                   transition: "all 0.3s ease",
-                  textAlign: "center",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
                 }}
               >
-                <div>
-                  <h4 style={{ marginBottom: "0.5rem" }}>{slot.name}</h4>
-                  <p>{slot.time}</p>
+                <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                  {slot.name}
                 </div>
+                <div style={{ marginTop: 6 }}>{slot.time}</div>
               </button>
             );
           })}

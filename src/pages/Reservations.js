@@ -370,6 +370,10 @@ function Reservations() {
                 {maskName(selectedReservation.studentName)}
               </p>
               <p>
+                <strong>지도교사:</strong>{" "}
+                {selectedReservation.teacherName || "미입력"}
+              </p>
+              <p>
                 <strong>장소:</strong> {selectedReservation.roomName}
               </p>
               <p>
