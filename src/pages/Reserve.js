@@ -980,7 +980,7 @@ function Reserve() {
                               {idx + 1}번 학번
                             </label>
                             <input
-                              type="text"
+                              type="number"
                               value={p.studentId}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -1281,8 +1281,8 @@ function Reserve() {
           fontSize: "0.95rem",
         }}
       >
-        <strong>안내:</strong> 취소는 당일 오후 13시 40분까지 가능합니다. 그
-        이후에는 관리자에게 문의해주세요.
+        <strong>안내:</strong> 취소는 당일 오전 8시까지 가능합니다. 그 이후에는
+        관리자에게 문의해주세요.
       </div>
 
       <div style={{ marginBottom: "2rem" }}>
