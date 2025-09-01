@@ -71,11 +71,25 @@ export const updateReservation = async (reservationId, updateData) => {
   }
 };
 
-// 예약 삭제
+// 예약 삭제 (서브컬렉션 members까지 함께 삭제)
 export const deleteReservation = async (reservationId) => {
+  if (!reservationId) throw new Error("reservationId가 없습니다.");
+
   try {
-    const reservationRef = doc(db, "reservations", reservationId);
-    await deleteDoc(reservationRef);
+    // 1) members 서브컬렉션 문서 일괄 삭제
+    const membersCol = collection(db, "reservations", reservationId, "members");
+    const membersSnap = await getDocs(membersCol);
+
+    if (!membersSnap.empty) {
+      const batch = writeBatch(db);
+      membersSnap.forEach((m) => {
+        batch.delete(doc(membersCol, m.id));
+      });
+      await batch.commit();
+    }
+
+    // 2) 부모 예약 문서 삭제
+    await deleteDoc(doc(db, "reservations", reservationId));
   } catch (error) {
     throw error;
   }
