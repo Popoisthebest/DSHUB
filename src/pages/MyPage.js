@@ -1,3 +1,4 @@
+// MyPage.js
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -34,19 +35,17 @@ function MyPage() {
   useEffect(() => {
     if (user) {
       if (user.role === "admin") {
-        // 관리자도 자신의 예약 현황을 볼 수 있도록 수정합니다.
+        // 관리자도 자신의 예약 현황을 볼 수 있도록
         loadUserReservations("admin");
       } else if (user.studentId) {
-        // 학생 사용자는 학번을 기준으로 예약 현황을 불러옵니다.
+        // 학생 사용자는 학번 기준으로 예약 로드
         loadUserReservations(user.studentId);
       } else {
-        // 사용자 정보는 있지만 학번이 없는 경우 (예: 프로필 미완성 학생)
         setLoadingReservations(false);
         setUserReservations([]);
         setReservationsError("예약 정보를 불러올 수 없습니다.");
       }
     } else {
-      // user 객체가 없는 경우 (로그아웃 상태 등)
       setLoadingReservations(false);
       setUserReservations([]);
       setReservationsError("로그인 정보가 없습니다.");
@@ -96,21 +95,36 @@ function MyPage() {
     }
   };
 
-  const handleCancel = async (reservationId) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const cutoffTime = new Date(today);
-    cutoffTime.setHours(13, 40, 0, 0);
+  // ✅ 변경: reservation 객체를 받아 당일만 시간 제한 적용 (08:00 기준)
+  const handleCancel = async (reservation) => {
+    setReservationsError("");
 
-    // 관리자는 시간 제한 없이 취소 가능
-    if (user?.role !== "admin" && now > cutoffTime) {
-      setReservationsError("오전 8시 이후에는 관리자에게 문의해주세요.");
+    const now = new Date();
+    const resDate = new Date(reservation.date);
+    const isSameDay =
+      resDate.getFullYear() === now.getFullYear() &&
+      resDate.getMonth() === now.getMonth() &&
+      resDate.getDate() === now.getDate();
+
+    // 당일만 오전 8시 컷오프 적용
+    const cutoffTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      8,
+      0,
+      0,
+      0
+    );
+
+    if (isSameDay && user?.role !== "admin" && now > cutoffTime) {
+      setReservationsError("당일 오전 8시 이후에는 관리자에게 문의해주세요.");
       return;
     }
 
     if (window.confirm("이 예약을 취소하시겠습니까?")) {
       try {
-        await deleteReservation(reservationId);
+        await deleteReservation(reservation.id);
         await loadUserReservations(user.studentId);
       } catch (error) {
         setReservationsError("예약 취소 중 오류가 발생했습니다.");
@@ -148,6 +162,7 @@ function MyPage() {
         <h2 style={{ marginBottom: "1rem" }}>마이페이지</h2>
       </div>
 
+      {/* 내 정보 */}
       <div
         style={{
           backgroundColor: "white",
@@ -190,6 +205,7 @@ function MyPage() {
         </button>
       </div>
 
+      {/* 내 예약 현황 */}
       <div
         style={{
           backgroundColor: "white",
@@ -201,6 +217,7 @@ function MyPage() {
         <h3 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
           내 예약 현황
         </h3>
+
         {reservationsError && (
           <div
             style={{
@@ -214,6 +231,7 @@ function MyPage() {
             {reservationsError}
           </div>
         )}
+
         {loadingReservations ? (
           <div style={{ textAlign: "center", padding: "2rem" }}>
             내 예약 로딩 중...
@@ -224,79 +242,87 @@ function MyPage() {
           </div>
         ) : (
           <div style={{ display: "grid", gap: "1rem" }}>
-            {userReservations.map((reservation) => (
-              <div
-                key={reservation.id}
-                style={{
-                  padding: "1.5rem",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <h3 style={{ marginBottom: "0.5rem" }}>
-                    {reservation.wing} - {reservation.floor} -{" "}
-                    {reservation.roomName}
-                  </h3>
-                  <p
-                    style={{
-                      color: "var(--text-color)",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {formatDate(reservation.date)}{" "}
-                    {reservation.time === "lunch"
-                      ? "점심시간"
-                      : reservation.time === "cip1"
-                      ? "CIP1"
-                      : reservation.time === "cip2"
-                      ? "CIP2"
-                      : reservation.time === "cip3"
-                      ? "CIP3"
-                      : reservation.timeRange}
-                  </p>
-                  <p style={{ color: "var(--text-color)", fontSize: "0.9rem" }}>
-                    예약자: {reservation.studentName}
-                  </p>
-                  <p style={{ color: "var(--text-color)", fontSize: "0.9rem" }}>
-                    예약일시:{" "}
-                    {new Date(reservation.createdAt.toDate()).toLocaleString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleCancel(reservation.id)}
+            {userReservations.map((reservation) => {
+              const isToday =
+                new Date(reservation.date).toDateString() ===
+                new Date().toDateString();
+              const pastCutoff =
+                new Date() > new Date(new Date().setHours(8, 0, 0, 0)); // 08:00
+
+              const blocked = user?.role !== "admin" && isToday && pastCutoff;
+
+              return (
+                <div
+                  key={reservation.id}
                   style={{
-                    padding: "0.5rem 1rem",
-                    backgroundColor: "#fee",
-                    color: "#c00",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    opacity:
-                      user?.role !== "admin" &&
-                      new Date() > new Date(new Date().setHours(8, 0, 0, 0))
-                        ? 0.5
-                        : 1,
+                    padding: "1.5rem",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "8px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}
-                  disabled={
-                    user?.role !== "admin" &&
-                    new Date() > new Date(new Date().setHours(8, 0, 0, 0))
-                  }
                 >
-                  {user?.role !== "admin" &&
-                  new Date() > new Date(new Date().setHours(8, 0, 0, 0))
-                    ? "취소 불가 (8시 이후)"
-                    : "예약 취소"}
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <h3 style={{ marginBottom: "0.5rem" }}>
+                      {reservation.wing} - {reservation.floor} -{" "}
+                      {reservation.roomName}
+                    </h3>
+                    <p
+                      style={{
+                        color: "var(--text-color)",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      {formatDate(reservation.date)}{" "}
+                      {reservation.time === "lunch"
+                        ? "점심시간"
+                        : reservation.time === "cip1"
+                        ? "CIP1"
+                        : reservation.time === "cip2"
+                        ? "CIP2"
+                        : reservation.time === "cip3"
+                        ? "CIP3"
+                        : reservation.timeRange}
+                    </p>
+                    <p
+                      style={{ color: "var(--text-color)", fontSize: "0.9rem" }}
+                    >
+                      예약자: {reservation.studentName}
+                    </p>
+                    <p
+                      style={{ color: "var(--text-color)", fontSize: "0.9rem" }}
+                    >
+                      예약일시:{" "}
+                      {new Date(
+                        reservation.createdAt.toDate()
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleCancel(reservation)} // ✅ 변경
+                    style={{
+                      padding: "0.5rem 1rem",
+                      backgroundColor: "#fee",
+                      color: "#c00",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      opacity: blocked ? 0.5 : 1, // ✅ 변경
+                    }}
+                    disabled={blocked} // ✅ 변경
+                  >
+                    {blocked ? "취소 불가 (당일 8시 이후)" : "예약 취소"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
+      {/* 내 문의 현황 */}
       <div
         style={{
           backgroundColor: "white",
@@ -309,6 +335,7 @@ function MyPage() {
         <h3 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
           내 문의 현황
         </h3>
+
         {inquiriesError && (
           <div
             style={{
@@ -322,6 +349,7 @@ function MyPage() {
             {inquiriesError}
           </div>
         )}
+
         {loadingInquiries ? (
           <div style={{ textAlign: "center", padding: "2rem" }}>
             문의 내역 로딩 중...
