@@ -1,4 +1,4 @@
-// UsersList.js (fixed)
+// UsersList.js
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
@@ -27,8 +27,11 @@ export default function UsersList() {
   const [editing, setEditing] = useState(null); // {id, name, studentId}
 
   useEffect(() => {
-    // ✅ 올바른 컬렉션: userProfiles
-    const qRef = query(collection(db, "userProfiles"), orderBy("name"));
+    // ✅ userProfiles 컬렉션에서 createdAt 기준 최신순 정렬
+    const qRef = query(
+      collection(db, "userProfiles"),
+      orderBy("createdAt", "desc")
+    );
     const unsub = onSnapshot(
       qRef,
       (snap) => {
@@ -46,18 +49,16 @@ export default function UsersList() {
 
   const filtered = useMemo(() => {
     const t = qText.trim().toLowerCase();
-    return users
-      .filter((u) => {
-        const role = u.role || "student"; // 기본값 student
-        if (roleFilter !== "all" && role !== roleFilter) return false;
-        if (!t) return true;
-        const key = `${u.name ?? ""} ${u.studentId ?? ""}`.toLowerCase();
-        return key.includes(t);
-      })
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    return users.filter((u) => {
+      const role = u.role || "student"; // 기본값 student
+      if (roleFilter !== "all" && role !== roleFilter) return false;
+      if (!t) return true;
+      const key = `${u.name ?? ""} ${u.studentId ?? ""}`.toLowerCase();
+      return key.includes(t);
+    });
   }, [users, qText, roleFilter]);
 
-  // ✅ 권한 변경: userProfiles/{id}.role 에 문자열로 저장
+  // ✅ 권한 변경
   const changeRole = async (userId, nextRole) => {
     try {
       await updateDoc(doc(db, "userProfiles", userId), { role: nextRole });
@@ -70,7 +71,6 @@ export default function UsersList() {
   const openEdit = (u) =>
     setEditing({ id: u.id, name: u.name ?? "", studentId: u.studentId ?? "" });
 
-  // ✅ 정보 수정도 userProfiles에 반영
   const saveEdit = async () => {
     try {
       if (!editing?.name?.trim() || !editing?.studentId?.trim()) {
@@ -202,7 +202,6 @@ export default function UsersList() {
                 <span style={badgeStyle}>{roleLabel}</span>
               </div>
 
-              {/* ✅ 역할 변경: 셀렉트로 단일 role 관리 */}
               <div>
                 <select
                   value={role}
