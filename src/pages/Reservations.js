@@ -544,7 +544,7 @@ const navBtnStyle = {
 
 const accordionSectionStyle = {
   border: "1px solid var(--border-color)",
-  borderRadius: "10px",
+  borderRadius: "5px",
   marginBottom: "0.75rem",
 };
 
