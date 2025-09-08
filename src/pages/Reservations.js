@@ -209,7 +209,7 @@ function Reservations() {
   useEffect(() => {
     // 탭 바뀔 때, 해당 탭의 모든 패널 기본 오픈(선호에 따라 닫힘으로 바꿔도 OK)
     const initial = {};
-    Object.keys(groupedByTime).forEach((k) => (initial[k] = true));
+    Object.keys(groupedByTime).forEach((k) => (initial[k] = false));
     setOpenPanels(initial);
   }, [activeDateKey, JSON.stringify(groupedByTime)]);
 
@@ -427,11 +427,6 @@ function Reservations() {
                             <div
                               style={{ textAlign: "right", minWidth: "90px" }}
                             >
-                              <div style={statusPill(reservation.status)}>
-                                {reservation.status === "active"
-                                  ? "확정"
-                                  : "취소"}
-                              </div>
                               <div
                                 style={{
                                   fontSize: "0.8rem",

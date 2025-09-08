@@ -120,6 +120,123 @@ function ReservationList() {
   const getFirstDayOfMonth = (date) =>
     new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
+  /* ===== 시간대 라벨 유틸 ===== */
+  const TIME_LABEL = (r) => {
+    if (r.time === "lunch") return "점심시간";
+    if (r.time === "cip1") return "CIP1";
+    if (r.time === "cip2") return "CIP2";
+    if (r.time === "cip3") return "CIP3";
+    return r.timeRange || "기타";
+  };
+
+  /* ===== 날짜 셀 내부 아코디언 ===== */
+  function DayTimeAccordion({ items }) {
+    // 시간대 정렬: lunch → cip1 → cip2 → cip3 → 기타
+    const order = { lunch: 1, cip1: 2, cip2: 3, cip3: 4 };
+    const sorted = [...items].sort((a, b) => {
+      const oa = order[a.time] || 99;
+      const ob = order[b.time] || 99;
+      if (oa !== ob) return oa - ob;
+      const rn = (a.roomName || a.room || "").localeCompare(
+        b.roomName || b.room || ""
+      );
+      if (rn !== 0) return rn;
+      return (a.studentName || "").localeCompare(b.studentName || "");
+    });
+
+    const grouped = sorted.reduce((acc, r) => {
+      const key = TIME_LABEL(r);
+      (acc[key] ||= []).push(r);
+      return acc;
+    }, {});
+
+    // 각 시간대 오픈 상태(기본 열림)
+    const [open, setOpen] = React.useState(() => {
+      const s = {};
+      Object.keys(grouped).forEach((k) => (s[k] = false));
+      return s;
+    });
+
+    const toggle = (k) => setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
+
+    return (
+      <div>
+        {Object.entries(grouped).map(([k, list]) => (
+          <div key={k} style={accordionSectionStyleCell}>
+            <button
+              onClick={() => toggle(k)}
+              style={{
+                ...accordionHeaderStyleCell,
+                background: open[k] ? "#f6f9ff" : "#fff",
+              }}
+              aria-expanded={!!open[k]}
+            >
+              <span style={{ color: "#000", fontWeight: 600 }}>{k}</span>
+              <span style={badgeStyleCell}>{list.length}</span>
+            </button>
+
+            {open[k] && (
+              <div style={accordionBodyStyleCell}>
+                {list.map((reservation) => (
+                  <div
+                    key={reservation.id}
+                    onClick={() => handleOpenDetailModal(reservation)}
+                    style={{
+                      ...cellCardStyle,
+                      backgroundColor:
+                        reservation.status === "active" ? "#e8f5e9" : "#ffebee",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: "0.92rem" }}>
+                      {reservation.roomName || reservation.room || "장소 미정"}
+                    </div>
+
+                    {/* 인원 수 배지 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        fontSize: "0.72rem",
+                        background: "#eef3ff",
+                        color: "#2b4cbf",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        border: "1px solid #d8e1ff",
+                      }}
+                      title="참여 인원 수"
+                    >
+                      {getGroupSize(reservation)}명
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "0.82rem",
+                        color: "var(--text-color-light)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {reservation.studentName}
+                      {reservation.studentId
+                        ? ` - ${reservation.studentId}`
+                        : ""}
+                    </div>
+                    {reservation.timeRange && k === "기타" && (
+                      <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                        {reservation.timeRange}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const renderCalendar = () => {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDay = getFirstDayOfMonth(currentDate);
@@ -199,75 +316,12 @@ function ReservationList() {
               >
                 {dayCount}
               </div>
+
+              {/* 날짜 셀 내부: 시간대 아코디언 */}
               <div style={{ marginTop: "2rem" }}>
-                {dayReservations.map((reservation) => (
-                  <div
-                    key={reservation.id}
-                    onClick={() => handleOpenDetailModal(reservation)}
-                    style={{
-                      padding: "0.5rem",
-                      marginBottom: "0.5rem",
-                      backgroundColor:
-                        reservation.status === "active" ? "#e8f5e9" : "#ffebee",
-                      borderRadius: "4px",
-                      fontSize: "0.9rem",
-                      cursor: "pointer",
-                      border: "1px solid transparent",
-                      boxShadow: "var(--shadow-small)",
-                      position: "relative",
-                    }}
-                  >
-                    <div style={{ fontWeight: "500" }}>
-                      {reservation.roomName || reservation.room || "장소 미정"}
-                    </div>
-
-                    {/* ▼ 인원 수 배지 */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 6,
-                        right: 6,
-                        fontSize: "0.75rem",
-                        background: "#eef3ff",
-                        color: "#2b4cbf",
-                        padding: "2px 6px",
-                        borderRadius: 999,
-                        border: "1px solid #d8e1ff",
-                      }}
-                      title="참여 인원 수"
-                    >
-                      {getGroupSize(reservation)}명
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--text-color-light)",
-                      }}
-                    >
-                      {reservation.room}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--text-color-light)",
-                      }}
-                    >
-                      {reservation.time === "lunch"
-                        ? "점심시간"
-                        : reservation.time === "cip1"
-                        ? "CIP1"
-                        : reservation.time === "cip2"
-                        ? "CIP2"
-                        : reservation.time === "cip3"
-                        ? "CIP3"
-                        : reservation.timeRange}
-                    </div>
-                    <div>
-                      {reservation.studentName} - {reservation.studentId}
-                    </div>
-                  </div>
-                ))}
+                {dayReservations.length === 0 ? null : (
+                  <DayTimeAccordion items={dayReservations} />
+                )}
               </div>
             </div>
           );
@@ -331,7 +385,7 @@ function ReservationList() {
       {isDetailModalOpen && selectedReservation && (
         <div
           style={modalOverlayStyle}
-          onClick={handleCloseDetailModal} // 오버레이 클릭 시 닫기
+          onClick={handleCloseDetailModal}
           role="dialog"
           aria-modal="true"
           aria-label="예약 상세 정보"
@@ -339,7 +393,7 @@ function ReservationList() {
         >
           <div
             style={modalContentStyle}
-            onClick={(e) => e.stopPropagation()} // 콘텐츠 클릭은 전파 막기
+            onClick={(e) => e.stopPropagation()}
             role="document"
           >
             <button
@@ -504,6 +558,58 @@ function ReservationList() {
     </div>
   );
 }
+
+/* ===== 날짜 셀 내부 아코디언 스타일 ===== */
+// 섹션: 외곽선 + 라운드만, overflow 미사용(둥근 모서리 잘림 방지)
+const accordionSectionStyleCell = {
+  border: "1px solid var(--border-color)",
+  borderRadius: "8px",
+  marginBottom: "0.5rem",
+};
+
+// 헤더: 전체 border 제거, 아래쪽 구분선만(이중 테두리 방지)
+const accordionHeaderStyleCell = {
+  width: "100%",
+  textAlign: "left",
+  padding: "0.6rem 0.7rem",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "0.5rem",
+  fontSize: "0.95rem",
+  background: "#fff",
+  border: "none",
+  borderBottom: "1px solid var(--border-color)",
+};
+
+const badgeStyleCell = {
+  display: "inline-block",
+  minWidth: "1.25rem",
+  textAlign: "center",
+  padding: "0.05rem 0.4rem",
+  borderRadius: "999px",
+  background: "#eef2ff",
+  color: "#4f46e5",
+  fontSize: "0.8rem",
+  fontWeight: 700,
+};
+
+const accordionBodyStyleCell = {
+  padding: "0.5rem",
+  background: "#fafafa",
+};
+
+// 날짜 셀 내부 카드(컴팩트)
+const cellCardStyle = {
+  position: "relative",
+  padding: "0.5rem 0.6rem",
+  borderRadius: "6px",
+  border: "1px solid #e5e7eb",
+  marginBottom: "0.45rem",
+  boxShadow: "var(--shadow-small)",
+  fontSize: "0.9rem",
+};
 
 /* ===== 모달 스타일 공통 ===== */
 const modalOverlayStyle = {
