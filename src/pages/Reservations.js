@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// Reservations.js
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { getAllReservations } from "../firebase/db";
 import { formatDateToYYYYMMDD, formatDate } from "../utils/dateUtils";
@@ -14,12 +15,20 @@ const maskName = (name) => {
   return firstChar + middleMask + lastChar;
 };
 
+const TIME_LABEL = (r) => {
+  if (r.time === "lunch") return "점심시간";
+  if (r.time === "cip1") return "CIP1";
+  if (r.time === "cip2") return "CIP2";
+  if (r.time === "cip3") return "CIP3";
+  return r.timeRange || "기타";
+};
+
 function Reservations() {
-  const [reservations, setReservations] = useState({}); // 날짜별로 그룹화된 예약
+  const [reservations, setReservations] = useState({}); // 날짜별 그룹
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedReservation, setSelectedReservation] = useState(null); // 선택된 예약
-  const [isModalOpen, setIsModalOpen] = useState(false); // 모달 가시성
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 주 시작(월요일)
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -29,12 +38,15 @@ function Reservations() {
     start.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     start.setHours(0, 0, 0, 0);
 
-    // 토(6) 또는 일(0) → 다음 주 월요일로 이동
+    // 토(6) 또는 일(0) → 다음 주 월요일
     if (dayOfWeek === 6 || dayOfWeek === 0) {
       start.setDate(start.getDate() + 7);
     }
     return start;
   });
+
+  // 탭: 선택된 날짜
+  const [activeDateKey, setActiveDateKey] = useState("");
 
   const location = useLocation();
   const message = location.state?.message;
@@ -44,7 +56,7 @@ function Reservations() {
     loadReservations();
   }, [currentWeekStart]);
 
-  // 🔒 모달 열렸을 때: 배경 스크롤/터치 차단 + ESC 닫기
+  // 모달 열렸을 때: 배경 스크롤/터치 차단 + ESC 닫기
   useEffect(() => {
     if (!isModalOpen) return;
 
@@ -79,13 +91,23 @@ function Reservations() {
 
       const data = await getAllReservations(startOfWeekStr, endOfWeekStr);
 
-      const groupedReservations = data.reduce((acc, reservation) => {
-        const dateKey = reservation.date; // YYYY-MM-DD
+      const grouped = data.reduce((acc, r) => {
+        const dateKey = r.date; // YYYY-MM-DD
         if (!acc[dateKey]) acc[dateKey] = [];
-        acc[dateKey].push(reservation);
+        acc[dateKey].push(r);
         return acc;
       }, {});
-      setReservations(groupedReservations);
+      setReservations(grouped);
+
+      // 기본 활성 탭: 오늘이 이번 주에 있으면 오늘, 아니면 월요일
+      const weekDays = getWeekDays(currentWeekStart);
+      const todayKey = formatDateToYYYYMMDD(new Date());
+      const keys = weekDays.map((d) => formatDateToYYYYMMDD(d));
+      if (keys.includes(todayKey)) {
+        setActiveDateKey(todayKey);
+      } else {
+        setActiveDateKey(keys[0]);
+      }
     } catch (error) {
       setError("예약 목록을 불러오는 중 오류가 발생했습니다.");
       console.error("예약 목록 로딩 오류:", error);
@@ -94,9 +116,9 @@ function Reservations() {
     }
   };
 
-  const getWeekDays = () => {
+  const getWeekDays = (start) => {
     const days = [];
-    let currentDay = new Date(currentWeekStart);
+    let currentDay = new Date(start);
     for (let i = 0; i < 5; i++) {
       days.push(new Date(currentDay));
       currentDay.setDate(currentDay.getDate() + 1);
@@ -129,7 +151,6 @@ function Reservations() {
     setSelectedReservation(reservation);
     setIsModalOpen(true);
   };
-
   const closeModal = () => {
     setSelectedReservation(null);
     setIsModalOpen(false);
@@ -142,7 +163,6 @@ function Reservations() {
       return newDate;
     });
   };
-
   const goToNextWeek = () => {
     setCurrentWeekStart((prev) => {
       const newDate = new Date(prev);
@@ -151,18 +171,66 @@ function Reservations() {
     });
   };
 
+  // 탭에 쓸 주간 날짜/키
+  const weekDays = useMemo(
+    () => getWeekDays(currentWeekStart),
+    [currentWeekStart]
+  );
+  const weekKeys = useMemo(
+    () => weekDays.map((d) => formatDateToYYYYMMDD(d)),
+    [weekDays]
+  );
+
+  // 아코디언: 시간대별 그룹
+  const groupedByTime = useMemo(() => {
+    const list = reservations[activeDateKey] || [];
+    // 정렬(시간대 우선순위: lunch, cip1, cip2, cip3, 기타)
+    const order = { lunch: 1, cip1: 2, cip2: 3, cip3: 4 };
+    const sorted = [...list].sort((a, b) => {
+      const oa = order[a.time] || 99;
+      const ob = order[b.time] || 99;
+      if (oa !== ob) return oa - ob;
+      // 같은 시간대면 roomName, studentName으로 보조 정렬
+      const rn = (a.roomName || "").localeCompare(b.roomName || "");
+      if (rn !== 0) return rn;
+      return (a.studentName || "").localeCompare(b.studentName || "");
+    });
+
+    return sorted.reduce((acc, r) => {
+      const key = TIME_LABEL(r);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(r);
+      return acc;
+    }, {});
+  }, [reservations, activeDateKey]);
+
+  // 아코디언 오픈 상태
+  const [openPanels, setOpenPanels] = useState({});
+  useEffect(() => {
+    // 탭 바뀔 때, 해당 탭의 모든 패널 기본 오픈(선호에 따라 닫힘으로 바꿔도 OK)
+    const initial = {};
+    Object.keys(groupedByTime).forEach((k) => (initial[k] = true));
+    setOpenPanels(initial);
+  }, [activeDateKey, JSON.stringify(groupedByTime)]);
+
+  const togglePanel = (key) => {
+    setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const badgeCount = (dateKey) => reservations[dateKey]?.length || 0;
+
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
-      <div style={{ marginBottom: "2rem" }}>
-        <h2 style={{ marginBottom: "1rem" }}>전체 예약 현황 (주중)</h2>
+    <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "2rem" }}>
+      <div style={{ marginBottom: "1.5rem" }}>
+        <h2 style={{ marginBottom: "0.75rem" }}>전체 예약 현황 (주중)</h2>
         {message && (
           <div
             style={{
               padding: "1rem",
-              marginBottom: "1rem",
+              marginBottom: "0.75rem",
               backgroundColor: messageType === "success" ? "#e6ffe6" : "#fee",
               color: messageType === "success" ? "#0a0" : "#c00",
-              borderRadius: "4px",
+              borderRadius: "6px",
             }}
           >
             {message}
@@ -172,10 +240,10 @@ function Reservations() {
           <div
             style={{
               padding: "1rem",
-              marginBottom: "1rem",
+              marginBottom: "0.75rem",
               backgroundColor: "#fee",
               color: "#c00",
-              borderRadius: "4px",
+              borderRadius: "6px",
             }}
           >
             {error}
@@ -186,155 +254,223 @@ function Reservations() {
       <div
         style={{
           backgroundColor: "white",
-          padding: "2rem",
-          borderRadius: "8px",
+          padding: "1.25rem",
+          borderRadius: "10px",
           boxShadow: "var(--shadow)",
         }}
       >
+        {/* 주간 내비게이션 */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
+            gap: "0.5rem",
             alignItems: "center",
-            marginBottom: "1.5rem",
+            marginBottom: "1rem",
           }}
         >
-          <button
-            onClick={goToPreviousWeek}
-            style={{
-              background: "var(--primary-color)",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-              fontSize: "1rem",
-            }}
-          >
+          <button onClick={goToPreviousWeek} style={navBtnStyle}>
             이전 주
           </button>
-          <h3 style={{ margin: "0", color: "var(--primary-color)" }}>
+          <h3 style={{ margin: 0, color: "var(--primary-color)" }}>
             {getWeekRangeString()}
           </h3>
-          <button
-            onClick={goToNextWeek}
-            style={{
-              background: "var(--primary-color)",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-              fontSize: "1rem",
-            }}
-          >
+          <button onClick={goToNextWeek} style={navBtnStyle}>
             다음 주
           </button>
         </div>
 
+        {/* 요일 탭 */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            overflowX: "auto",
+            paddingBottom: "0.25rem",
+            borderBottom: "1px solid var(--border-color)",
+            marginBottom: "1rem",
+          }}
+        >
+          {weekDays.map((date, idx) => {
+            const key = weekKeys[idx];
+            const active = key === activeDateKey;
+            const todayMark = isToday(date);
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveDateKey(key)}
+                style={{
+                  whiteSpace: "nowrap",
+                  padding: "0.6rem 0.9rem",
+                  borderRadius: "999px",
+                  border: active
+                    ? "1px solid var(--primary-color)"
+                    : "1px solid var(--border-color)",
+                  background: active ? "var(--primary-color)" : "#fff",
+                  color: active
+                    ? "#fff"
+                    : todayMark
+                    ? "var(--primary-color)"
+                    : "var(--text-color)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  boxShadow: active ? "var(--shadow-sm)" : "none",
+                }}
+                aria-pressed={active}
+              >
+                {getDayName(date)}{" "}
+                {`(${date.getMonth() + 1}/${date.getDate()})`}
+                <span
+                  style={{
+                    display: "inline-block",
+                    minWidth: "1.5rem",
+                    textAlign: "center",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "999px",
+                    background: active ? "rgba(255,255,255,0.25)" : "#f1f3f5",
+                    color: active ? "#fff" : "#555",
+                    fontSize: "0.85rem",
+                  }}
+                  aria-label="예약 수"
+                >
+                  {badgeCount(key)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 선택된 날짜의 아코디언(시간대별) */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "2rem" }}>로딩 중...</div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "10px",
-            }}
-          >
-            {getWeekDays().map((date) => {
-              const dateKey = formatDateToYYYYMMDD(date);
-              const dailyReservations = reservations[dateKey] || [];
-              return (
-                <div
-                  key={dateKey}
-                  style={{
-                    border: `1px solid ${
-                      isToday(date)
-                        ? "var(--primary-color)"
-                        : "var(--border-color)"
-                    }`,
-                    borderRadius: "8px",
-                    padding: "1rem",
-                    backgroundColor: isToday(date) ? "#e6f7ff" : "#f9f9f9",
-                    minHeight: "150px",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <h4
+          <div>
+            {Object.keys(groupedByTime).length === 0 ? (
+              <div
+                style={{ color: "var(--text-color-light)", padding: "1rem" }}
+              >
+                예약 없음
+              </div>
+            ) : (
+              Object.entries(groupedByTime).map(([panelKey, items]) => (
+                <div key={panelKey} style={accordionSectionStyle}>
+                  <button
+                    onClick={() => togglePanel(panelKey)}
                     style={{
-                      margin: "0 0 0.5rem 0",
-                      textAlign: "center",
-                      color: isToday(date)
+                      ...accordionHeaderStyle,
+                      background: openPanels[panelKey] ? "#f6f9ff" : "#fff",
+                      borderColor: openPanels[panelKey]
                         ? "var(--primary-color)"
-                        : "var(--text-color)",
+                        : "var(--border-color)",
                     }}
+                    aria-expanded={!!openPanels[panelKey]}
                   >
-                    {getDayName(date)} ({date.getMonth() + 1}/{date.getDate()})
-                  </h4>
-                  {dailyReservations.length === 0 ? (
-                    <div style={{ color: "var(--text-color-light)" }}>
-                      예약 없음
-                    </div>
-                  ) : (
-                    <div style={{ flexGrow: 1, overflowY: "auto" }}>
-                      {dailyReservations.map((reservation) => (
+                    <span style={{ color: "#000", fontWeight: 600 }}>
+                      {panelKey}
+                    </span>
+                    <span style={badgeStyle}>{items.length}</span>
+                  </button>
+
+                  {openPanels[panelKey] && (
+                    <div style={accordionBodyStyle}>
+                      {items.map((reservation) => (
                         <div
                           key={reservation.id}
                           onClick={() => openModal(reservation)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && openModal(reservation)
+                          }
                           style={{
+                            ...cardStyle,
                             backgroundColor:
                               reservation.status === "active"
                                 ? "#e8f5e9"
                                 : "#ffebee",
-                            padding: "0.5rem",
-                            borderRadius: "4px",
-                            marginBottom: "0.5rem",
-                            cursor: "pointer",
-                            fontSize: "0.9rem",
                           }}
                         >
-                          <p style={{ margin: 0, fontWeight: "500" }}>
-                            {reservation.time === "lunch"
-                              ? "점심시간"
-                              : reservation.time === "cip1"
-                              ? "CIP1"
-                              : reservation.time === "cip2"
-                              ? "CIP2"
-                              : reservation.time === "cip3"
-                              ? "CIP3"
-                              : reservation.timeRange}
-                          </p>
-                          <p
+                          <div
                             style={{
-                              margin: "0.2rem 0",
-                              fontSize: "0.9rem",
-                              color: "var(--text-color)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: "0.75rem",
                             }}
                           >
-                            장소: {reservation.roomName}
-                          </p>
-                          <p
-                            style={{
-                              color: "var(--text-color)",
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            예약자: {maskName(reservation.studentName)}
-                          </p>
+                            <div style={{ flex: 1 }}>
+                              <div
+                                style={{ fontSize: "0.95rem", fontWeight: 600 }}
+                              >
+                                {reservation.roomName}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.9rem",
+                                  color: "var(--text-color)",
+                                }}
+                              >
+                                예약자: {maskName(reservation.studentName)}
+                              </div>
+                              {reservation.club && (
+                                <div
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    color: "#6b7280",
+                                  }}
+                                >
+                                  동아리: {reservation.club}
+                                </div>
+                              )}
+                            </div>
+                            <div
+                              style={{ textAlign: "right", minWidth: "90px" }}
+                            >
+                              <div style={statusPill(reservation.status)}>
+                                {reservation.status === "active"
+                                  ? "확정"
+                                  : "취소"}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.8rem",
+                                  color: "#6b7280",
+                                  marginTop: "0.35rem",
+                                }}
+                              >
+                                {reservation.timeRange && panelKey === "기타"
+                                  ? reservation.timeRange
+                                  : ""}
+                              </div>
+                            </div>
+                          </div>
+                          {reservation.reason && (
+                            <div
+                              style={{
+                                marginTop: "0.4rem",
+                                fontSize: "0.88rem",
+                                color: "#374151",
+                              }}
+                            >
+                              사유:{" "}
+                              {reservation.reason.length > 60
+                                ? reservation.reason.slice(0, 60) + "…"
+                                : reservation.reason}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         )}
       </div>
 
-      {/* === 모달 === */}
+      {/* 모달 */}
       {isModalOpen && selectedReservation && (
         <div
           style={modalOverlayStyle}
@@ -357,10 +493,7 @@ function Reservations() {
               &times;
             </button>
             <h3
-              style={{
-                marginBottom: "1.5rem",
-                color: "var(--primary-color)",
-              }}
+              style={{ marginBottom: "1.2rem", color: "var(--primary-color)" }}
             >
               예약 상세 정보
             </h3>
@@ -380,16 +513,7 @@ function Reservations() {
                 <strong>날짜:</strong> {selectedReservation.date}
               </p>
               <p>
-                <strong>시간:</strong>{" "}
-                {selectedReservation.time === "lunch"
-                  ? "점심시간"
-                  : selectedReservation.time === "cip1"
-                  ? "CIP1"
-                  : selectedReservation.time === "cip2"
-                  ? "CIP2"
-                  : selectedReservation.time === "cip3"
-                  ? "CIP3"
-                  : selectedReservation.timeRange}
+                <strong>시간:</strong> {TIME_LABEL(selectedReservation)}
               </p>
               {selectedReservation.club && (
                 <p>
@@ -407,7 +531,75 @@ function Reservations() {
   );
 }
 
-/* ===== 모달 스타일 공통 ===== */
+/* ===== 스타일 ===== */
+const navBtnStyle = {
+  background: "var(--primary-color)",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  padding: "0.5rem 1rem",
+  cursor: "pointer",
+  fontSize: "1rem",
+};
+
+const accordionSectionStyle = {
+  border: "1px solid var(--border-color)",
+  borderRadius: "10px",
+  marginBottom: "0.75rem",
+};
+
+const accordionHeaderStyle = {
+  width: "100%",
+  textAlign: "left",
+  padding: "0.9rem 1rem",
+  cursor: "pointer",
+  borderBottom: "1px solid var(--border-color)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "0.75rem",
+  fontSize: "1rem",
+  background: "#fff",
+  border: "1px solid var(--border-color)",
+};
+
+const badgeStyle = {
+  display: "inline-block",
+  minWidth: "1.5rem",
+  textAlign: "center",
+  padding: "0.15rem 0.45rem",
+  borderRadius: "999px",
+  background: "#eef2ff",
+  color: "#4f46e5",
+  fontSize: "0.85rem",
+  fontWeight: 600,
+};
+
+const accordionBodyStyle = {
+  padding: "0.75rem",
+  background: "#fafafa",
+};
+
+const cardStyle = {
+  padding: "0.75rem",
+  borderRadius: "8px",
+  border: "1px solid #e5e7eb",
+  marginBottom: "0.6rem",
+  cursor: "pointer",
+  boxShadow: "var(--shadow-xs)",
+};
+
+const statusPill = (status) => ({
+  display: "inline-block",
+  padding: "0.2rem 0.55rem",
+  borderRadius: "999px",
+  fontSize: "0.8rem",
+  fontWeight: 700,
+  background: status === "active" ? "#d1fae5" : "#fee2e2",
+  color: status === "active" ? "#065f46" : "#991b1b",
+});
+
+/* ===== 모달 ===== */
 const modalOverlayStyle = {
   position: "fixed",
   top: 0,
@@ -419,7 +611,6 @@ const modalOverlayStyle = {
   justifyContent: "center",
   alignItems: "center",
   zIndex: 1000,
-  // 바운스/백그라운드 스크롤 방지
   overscrollBehavior: "contain",
   touchAction: "none",
 };
