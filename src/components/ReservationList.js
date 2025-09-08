@@ -263,6 +263,9 @@ function ReservationList() {
                         ? "CIP3"
                         : reservation.timeRange}
                     </div>
+                    <div>
+                      {reservation.studentName} - {reservation.studentId}
+                    </div>
                   </div>
                 ))}
               </div>

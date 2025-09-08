@@ -370,6 +370,17 @@ export const addInquiry = async (inquiryData) => {
   }
 };
 
+// 문의 삭제
+export const deleteInquiry = async (inquiryId) => {
+  try {
+    if (!inquiryId) throw new Error("inquiryId가 없습니다.");
+    await deleteDoc(doc(db, "inquiries", inquiryId));
+  } catch (error) {
+    console.error("문의 삭제 오류:", error);
+    throw error;
+  }
+};
+
 // 문의 목록 조회
 export const getInquiries = async (studentId) => {
   try {

@@ -8,6 +8,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { deleteInquiry } from "../firebase/db";
 
 function InquiryList() {
   const [inquiries, setInquiries] = useState([]);
@@ -155,6 +156,22 @@ function InquiryList() {
                 >
                   답변일: {inquiry.replyDate?.toDate().toLocaleString()}
                 </div>
+
+                {/* 🔹답변 완료 시 삭제 버튼 */}
+                <button
+                  onClick={() => deleteInquiry(inquiry.id)}
+                  style={{
+                    marginTop: "1rem",
+                    padding: "0.5rem 1rem",
+                    backgroundColor: "red",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  삭제
+                </button>
               </div>
             )}
 
