@@ -52,8 +52,10 @@ function Reserve() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // [1] 상태 추가 (컴포넌트 상단의 useState 구역)
-  const [additionalCount, setAdditionalCount] = useState(1); // 본인 제외 인원수
+  // [1] 인원/참가자 상태
+  // - student : additionalCount = "본인 제외 인원수"
+  // - teacher/admin : additionalCount = "학생 수(명)" (명단 입력 없음)
+  const [additionalCount, setAdditionalCount] = useState(1);
   const [participants, setParticipants] = useState([]); // [{studentId, name}]
 
   // 지도교사 성함 (필수)
@@ -106,20 +108,27 @@ function Reserve() {
     const cap = getCapacity(selectedRoom); // null => 무제한
     const remain = cap == null ? null : Math.max(0, cap - used);
 
-    // 본인 제외 가능한 최대치
+    // 본인 제외 가능한 최대치(학생은 '본인 제외', 교사/관리자는 '학생 수'로 해석)
     const myMaxAdditional = remain == null ? 999 : Math.max(0, remain - 1);
 
     // 현재 값이 최대를 넘는 경우 보정
     setAdditionalCount((prev) => {
-      // 허용 범위 [0, myMaxAdditional] 로 클램프
       let v = typeof prev === "number" ? prev : parseInt(prev || "0", 10);
       if (!Number.isFinite(v) || v < 0) v = 0;
       if (v > myMaxAdditional) v = myMaxAdditional;
       return v;
     });
 
-    // participants 배열 길이도 additionalCount에 맞추어 보정
+    // 역할 기반 명단 처리
+    const role = user?.role || "student";
+    const isTeacherOrAdmin = role === "teacher" || role === "admin";
+
     setParticipants((prev) => {
+      if (isTeacherOrAdmin) {
+        // 교사/관리자: 학번/이름 명단 입력 안 함
+        return [];
+      }
+      // 학생: 입력 칸 수를 additionalCount에 맞춤
       let v =
         typeof additionalCount === "number"
           ? additionalCount
@@ -152,34 +161,27 @@ function Reserve() {
     return [];
   };
 
-  // 층 정렬용 순위 함수: "1층" → 1, "2층" → 2, 그 외는 맨 뒤로
+  // 층 정렬용 순위 함수
   const floorRank = (label) => {
     const s = String(label ?? "")
       .replace(/\\/g, "")
       .trim();
-    const m = s.match(/^(\d+)\s*층$/); // "1층", "2층" ...
+    const m = s.match(/^(\d+)\s*층$/);
     if (m) return parseInt(m[1], 10);
-
-    // 혹시 남아있을 수 있는 "1st FLOOR" 같은 것까지 느슨하게 케어
     const m2 = s.match(/^(\d+)/);
     if (m2) return parseInt(m2[1], 10);
-
-    return Number.POSITIVE_INFINITY; // 숫자 못 뽑으면 뒤로
+    return Number.POSITIVE_INFINITY;
   };
 
-  // NEW: floors 중심 트리
+  // floors → rooms 트리
   const floorTree = useMemo(() => {
     const list = Array.isArray(places) ? places : [];
-
-    // 1) 층 → 방들
     const byFloor = list.reduce((acc, p) => {
       const floorKey = p.floor ?? "";
       if (!acc[floorKey]) acc[floorKey] = [];
       acc[floorKey].push(p);
       return acc;
     }, {});
-
-    // 2) 정렬 포함(활성 우선 → 이름순)
     return Object.entries(byFloor)
       .sort(([fa], [fb]) => floorRank(fa) - floorRank(fb))
       .map(([floor, rooms]) => ({
@@ -194,7 +196,7 @@ function Reserve() {
       }));
   }, [places]);
 
-  // ---------- 날짜 포맷/주간생성 유틸(기존 그대로) ----------
+  // ---------- 날짜/주간 유틸 ----------
   const formatDateToYYYYMMDD = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -212,7 +214,7 @@ function Reserve() {
     monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
     monday.setHours(0, 0, 0, 0);
 
-    // 토(6) 또는 일(0)이라면 기준을 다음 주 월요일로 이동
+    // 주말이면 다음 주 월요일로
     if (day === 6 || day === 0) {
       monday.setDate(monday.getDate() + 7);
     }
@@ -233,7 +235,7 @@ function Reserve() {
       weekday: "long",
     });
 
-  // 교체: 주간 예약 로딩 useEffect
+  // 주간 예약 로딩
   useEffect(() => {
     const fetchWeekReservations = async () => {
       if (!selectedDate) {
@@ -242,7 +244,6 @@ function Reserve() {
       }
       setLoadingWeekReservations(true);
       try {
-        // 선택한 날짜가 속한 주(월~금)로 범위 계산
         const base = new Date(selectedDate);
         const day = base.getDay(); // 0=Sun..6=Sat
         const monday = new Date(base);
@@ -276,14 +277,14 @@ function Reserve() {
     fetchWeekReservations();
   }, [selectedDate]);
 
-  // 참가자(본인 제외) 중복 검사: 학번과 이름이 모두 동일하면 동일인으로 간주
+  // 참가자(본인 제외) 중복 검사
   const findDuplicateParticipantIndexes = (arr) => {
-    const seen = new Map(); // key: "studentId|name" (trim)
-    const dupIdx = new Set(); // 중복 인덱스 모음
+    const seen = new Map();
+    const dupIdx = new Set();
     arr.forEach((p, i) => {
       const id = (p.studentId ?? "").trim();
       const nm = (p.name ?? "").trim();
-      if (!id || !nm) return; // 비어있으면 중복 판단 제외
+      if (!id || !nm) return;
       const key = `${id}|${nm}`;
       if (seen.has(key)) {
         dupIdx.add(seen.get(key));
@@ -319,9 +320,11 @@ function Reserve() {
       return;
     }
 
-    // ✅ role 기반 교사전용 가드 (추가)
+    // role 기반
     const role = user?.role || "student";
     const isTeacherOrAdmin = role === "teacher" || role === "admin";
+
+    // 교사전용 가드
     if (selectedRoom.teacherOnly && !isTeacherOrAdmin) {
       setError(
         "해당 공간은 지도교사(또는 지도교사 임장시)/관리자만 신청 가능합니다."
@@ -346,9 +349,14 @@ function Reserve() {
       const dateStr = formatDateToYYYYMMDD(selectedDate);
 
       // 1) 인원 계산/검증
-      const perMin = getPerReservationMin(selectedRoom); // 팀당 최소(본인 포함)
-      const capacity = getCapacity(selectedRoom); // 총 정원(null=무제한)
-      const groupSize = 1 + (parseInt(additionalCount, 10) || 0); // 본인 포함 총 인원
+      const perMin = getPerReservationMin(selectedRoom); // 팀당 최소(학생/관리자 예약 기준: 본인 포함, 교사/관리자 정책상 그대로 사용)
+      const capacity = getCapacity(selectedRoom);
+
+      // teacher/admin : groupSize = 학생 수(입력값 그대로)
+      // student       : groupSize = 1 + additionalCount(본인 포함)
+      const parsedCnt = parseInt(additionalCount, 10);
+      const cleanCnt = Number.isFinite(parsedCnt) ? parsedCnt : 0;
+      const groupSize = isTeacherOrAdmin ? cleanCnt : 1 + cleanCnt;
 
       if (groupSize < perMin) {
         setError(`이 공간은 팀당 최소 ${perMin}명부터 예약 가능합니다.`);
@@ -356,7 +364,7 @@ function Reserve() {
         return;
       }
 
-      // 2) 해당 시간대 사용 중 정원 계산 (여러 팀 허용)
+      // 2) 해당 시간대 사용 중 정원 계산
       const existing = await getReservationsByDateV2(
         dateStr,
         selectedRoom.id,
@@ -377,14 +385,16 @@ function Reserve() {
         return;
       }
 
-      // 3) 참가자(본인 제외) 입력 검증
-      if (
-        participants.length !== groupSize - 1 ||
-        participants.some((p) => !p.studentId?.trim() || !p.name?.trim())
-      ) {
-        setError("참가자 학번/이름을 모두 입력해주세요.");
-        setLoading(false);
-        return;
+      // 3) 참가자(본인 제외) 입력 검증 (student만)
+      if (!isTeacherOrAdmin) {
+        if (
+          participants.length !== groupSize - 1 ||
+          participants.some((p) => !p.studentId?.trim() || !p.name?.trim())
+        ) {
+          setError("참가자 학번/이름을 모두 입력해주세요.");
+          setLoading(false);
+          return;
+        }
       }
 
       // 4) 예약 데이터 저장 (인원 스냅샷 포함)
@@ -399,15 +409,15 @@ function Reserve() {
         time: selectedTime.id,
         timeRange: selectedTime.time,
         club: club.trim(),
-        teacherName: teacherName.trim(), // ✅ 추가
+        teacherName: teacherName.trim(),
         reason: reason.trim(),
         status: "active",
         createdAt: new Date(),
 
         // 인원 관련
-        groupSize, // 본인 포함 총 인원
-        additionalCount: groupSize - 1, // 본인 제외 인원
-        participants, // [{studentId, name}]
+        groupSize, // teacher/admin: 학생 수, student: 본인 포함
+        additionalCount: isTeacherOrAdmin ? groupSize : groupSize - 1,
+        participants: isTeacherOrAdmin ? [] : participants, // teacher/admin: 명단 저장 X
         perReservationMin: perMin,
         capacity, // null이면 무제한
       };
@@ -422,7 +432,7 @@ function Reserve() {
           studentId: user?.role === "admin" ? "admin" : user.studentId,
           name: user.name || user.displayName || "알 수 없음",
         },
-        participants // [{ studentId, name }]
+        isTeacherOrAdmin ? [] : participants
       );
 
       navigate("/reservations", {
@@ -438,7 +448,7 @@ function Reserve() {
     }
   };
 
-  // [2] 헬퍼 추가 (컴포넌트 내부 공용 함수 영역)
+  // [2] 헬퍼
   const getPerReservationMin = (room) => {
     const v = Number(room?.perReservationMin);
     return Number.isFinite(v) && v > 0 ? v : 1; // 기본 1명 이상
@@ -483,7 +493,7 @@ function Reserve() {
             <p style={{ color: "var(--text-color)" }}>
               {(() => {
                 const names = floor.rooms.map((room) => room.name);
-                const preview = names.slice(0, 3).join(", "); // 처음 3개만 표시
+                const preview = names.slice(0, 3).join(", ");
                 return names.length > 3
                   ? `${preview} ...`
                   : preview || "등록된 공간 없음";
@@ -495,44 +505,29 @@ function Reserve() {
     </div>
   );
 
-  // 변경: renderRoomSelection
+  // ---------- 장소 선택 ----------
   const renderRoomSelection = () => {
     const dateKey = selectedDate ? formatDateToYYYYMMDD(selectedDate) : null;
     const dayReservations = (dateKey && weekReservations[dateKey]) || [];
 
-    // ✅ 사용자 role 기반 접근 권한
+    // role
     const role = user?.role || "student";
     const isTeacherOrAdmin = role === "teacher" || role === "admin";
 
-    // 헬퍼: 특정 방이 이미 예약됐는지
-    const isRoomBooked = (roomId) =>
-      dayReservations.some(
-        (res) =>
-          res.roomId === roomId &&
-          res.time === selectedTime?.id &&
-          res.status === "active"
-      );
-
-    // 선택된 층의 모든 방을 윙으로 그룹핑
+    // 선택된 층의 방을 윙으로 그룹핑
     const roomsInFloor = selectedFloor.rooms;
-
     const byWing = roomsInFloor.reduce((acc, r) => {
       const wingKey = r.wing ?? "";
       if (!acc[wingKey]) acc[wingKey] = [];
       acc[wingKey].push(r);
       return acc;
     }, {});
-
-    // 원하는 표시 순서
     const ZONE_ORDER = ["소그룹 ZONE", "대그룹 ZONE", "별도예약"];
-
-    // byWing 객체 기준으로, 세 ZONE을 고정 순서로 배열화 (없는 ZONE은 빈 배열)
     const zoneSections = ZONE_ORDER.map((zone) => ({
       zone,
       rooms: byWing[zone] || [],
     }));
 
-    // [3] renderRoomSelection 내부: (선택된 날짜/시간/층 계산 이후) 보조 함수들
     const getUsedCapacity = (roomId) =>
       dayReservations
         .filter(
@@ -543,10 +538,10 @@ function Reserve() {
         )
         .reduce((sum, r) => sum + (Number(r.groupSize) || 1), 0);
 
-    const participantsComplete = areParticipantsComplete(
-      additionalCount,
-      participants
-    );
+    // 버튼 활성화 조건: 교사/관리자는 참가자 명단 체크 제외
+    const participantsComplete =
+      isTeacherOrAdmin ||
+      areParticipantsComplete(additionalCount, participants);
 
     return (
       <div>
@@ -559,7 +554,6 @@ function Reserve() {
           {selectedTime?.time})
         </p>
 
-        {/* ZONE들을 가로로 3열 배치 */}
         <div
           style={{
             display: "grid",
@@ -579,7 +573,6 @@ function Reserve() {
                 background: "white",
               }}
             >
-              {/* 섹션 헤더 (ZONE명) */}
               <h4
                 style={{
                   marginBottom: "1rem",
@@ -592,7 +585,6 @@ function Reserve() {
                 {(zone || "").replace(/\\/g, "")}
               </h4>
 
-              {/* ZONE 내 방 카드들 */}
               <div
                 style={{
                   display: "grid",
@@ -615,16 +607,11 @@ function Reserve() {
                   </div>
                 ) : (
                   rooms.map((room) => {
-                    // 총 정원(숫자면 제한, null이면 무제한)과 현재 사용 인원 합계를 계산
                     const cap = getCapacity(room); // null => 무제한
-                    const used = getUsedCapacity(room.id); // 활성 예약들의 groupSize 합(없으면 1로 가정)
+                    const used = getUsedCapacity(room.id);
 
-                    // "예약 1건이라도 있으면 비활성화"는 '무제한(cap == null)'에만 적용
-                    // '최대 인원(cap 숫자)'이 있는 방은 기존 방식대로 used >= cap 일 때만 비활성화
                     let blocked, blockMessage;
-
                     if (cap == null) {
-                      // 무제한: 한 팀만 허용 → 사용 인원이 1명 이상이면 이미 사용 중
                       const inUse = used > 0;
                       blocked =
                         inUse ||
@@ -638,7 +625,6 @@ function Reserve() {
                         ? room.disabledReason || "*신청 불가능한 교실입니다."
                         : "";
                     } else {
-                      // 제한 있음: 정원이 찼을 때만 비활성화
                       const atCapacity = used >= cap;
                       blocked =
                         atCapacity ||
@@ -851,12 +837,15 @@ function Reserve() {
               ></textarea>
             </div>
 
-            {/* [인원수/참가자 입력] — club / reason 위에 추가 */}
+            {/* 인원수/참가자 입력 */}
             {(() => {
-              const minTeam = getPerReservationMin(selectedRoom); // 팀당 최소 인원(본인 포함)
-              const cap = getCapacity(selectedRoom); // 총 정원(null=무제한)
+              const roleLocal = user?.role || "student";
+              const isTeacherOrAdminLocal =
+                roleLocal === "teacher" || roleLocal === "admin";
+
+              const minTeam = getPerReservationMin(selectedRoom);
+              const cap = getCapacity(selectedRoom);
               const used = (() => {
-                // renderRoomSelection 상단에 있는 getUsedCapacity(roomId) 활용
                 return dayReservations
                   .filter(
                     (res) =>
@@ -898,7 +887,7 @@ function Reserve() {
                     </div>
                   </div>
 
-                  {/* 본인 제외 인원수 */}
+                  {/* 인원 입력: teacher/admin → "학생 수(명)", student → "본인 제외 인원수" */}
                   <label
                     style={{
                       display: "block",
@@ -906,18 +895,18 @@ function Reserve() {
                       marginBottom: 6,
                     }}
                   >
-                    본인 제외 인원수
+                    {isTeacherOrAdminLocal ? "학생 수(명)" : "본인 제외 인원수"}
                   </label>
                   <input
                     type="number"
-                    min={0}
+                    min={isTeacherOrAdminLocal ? 1 : 0}
                     max={myMaxAdditional}
                     value={additionalCount}
                     onChange={(e) => {
                       let raw = e.target.value;
 
-                      // 0을 입력했을 때는 강제로 1로 교체
-                      if (raw === "0") {
+                      // 학생: 0 입력 특수 처리(기존 정책 유지)
+                      if (!isTeacherOrAdminLocal && raw === "0") {
                         setAdditionalCount(1);
                         setParticipants((prev) => {
                           const next = prev.slice(0, 1);
@@ -928,103 +917,120 @@ function Reserve() {
                         return;
                       }
 
-                      // 빈 문자열은 그대로 허용 (지우는 중일 때)
+                      // 공백 허용
                       if (raw === "") {
                         setAdditionalCount("");
                         setParticipants([]);
                         return;
                       }
 
-                      // 숫자 파싱 후 범위 제한
                       let parsed = parseInt(raw, 10);
-                      if (!Number.isFinite(parsed)) parsed = 1;
+                      if (!Number.isFinite(parsed))
+                        parsed = isTeacherOrAdminLocal ? 1 : 0;
 
-                      const v = Math.max(0, Math.min(myMaxAdditional, parsed));
+                      const v = Math.max(
+                        isTeacherOrAdminLocal ? 1 : 0,
+                        Math.min(myMaxAdditional, parsed)
+                      );
 
                       setAdditionalCount(v);
-                      setParticipants((prev) => {
-                        const next = prev.slice(0, v);
-                        while (next.length < v)
-                          next.push({ studentId: "", name: "" });
-                        return next;
-                      });
+
+                      // teacher/admin → 명단 비움, student → 길이 맞춤
+                      if (isTeacherOrAdminLocal) {
+                        setParticipants([]);
+                      } else {
+                        setParticipants((prev) => {
+                          const next = prev.slice(0, v);
+                          while (next.length < v)
+                            next.push({ studentId: "", name: "" });
+                          return next;
+                        });
+                      }
                     }}
                     style={{
-                      width: 120,
+                      width: 160,
                       padding: "0.6rem",
                       border: "1px solid var(--border-color)",
                       borderRadius: 4,
                     }}
                   />
 
-                  {/* 참가자(본인 제외) 입력 */}
-                  {participants.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: "1rem",
-                        display: "grid",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      {participants.map((p, idx) => (
+                  {/* 학번/이름 입력란: teacher/admin은 아예 숨김 */}
+                  {(() => {
+                    if (isTeacherOrAdminLocal) return null;
+                    return (
+                      participants.length > 0 && (
                         <div
-                          key={idx}
                           style={{
+                            marginTop: "1rem",
                             display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "0.5rem",
+                            gap: "0.75rem",
                           }}
                         >
-                          <div>
-                            <label style={{ fontSize: 13, color: "#666" }}>
-                              {idx + 1}번 학번
-                            </label>
-                            <input
-                              type="number"
-                              value={p.studentId}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setParticipants((prev) => {
-                                  const next = prev.slice();
-                                  next[idx] = { ...next[idx], studentId: val };
-                                  return next;
-                                });
-                              }}
+                          {participants.map((p, idx) => (
+                            <div
+                              key={idx}
                               style={{
-                                width: "100%",
-                                padding: "0.6rem",
-                                border: "1px solid var(--border-color)",
-                                borderRadius: 4,
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: "0.5rem",
                               }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: 13, color: "#666" }}>
-                              {idx + 1}번 이름
-                            </label>
-                            <input
-                              type="text"
-                              value={p.name}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setParticipants((prev) => {
-                                  const next = prev.slice();
-                                  next[idx] = { ...next[idx], name: val };
-                                  return next;
-                                });
-                              }}
-                              style={{
-                                width: "100%",
-                                padding: "0.6rem",
-                                border: "1px solid var(--border-color)",
-                                borderRadius: 4,
-                              }}
-                            />
-                          </div>
+                            >
+                              <div>
+                                <label style={{ fontSize: 13, color: "#666" }}>
+                                  {idx + 1}번 학번
+                                </label>
+                                <input
+                                  type="number"
+                                  value={p.studentId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setParticipants((prev) => {
+                                      const next = prev.slice();
+                                      next[idx] = {
+                                        ...next[idx],
+                                        studentId: val,
+                                      };
+                                      return next;
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    padding: "0.6rem",
+                                    border: "1px solid var(--border-color)",
+                                    borderRadius: 4,
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: 13, color: "#666" }}>
+                                  {idx + 1}번 이름
+                                </label>
+                                <input
+                                  type="text"
+                                  value={p.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setParticipants((prev) => {
+                                      const next = prev.slice();
+                                      next[idx] = { ...next[idx], name: val };
+                                      return next;
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    padding: "0.6rem",
+                                    border: "1px solid var(--border-color)",
+                                    borderRadius: 4,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )
+                    );
+                  })()}
                 </div>
               );
             })()}
@@ -1084,12 +1090,11 @@ function Reserve() {
     );
   };
 
-  // 변경: renderDateSelection (방 의존 제거, 클릭 시 step=2로)
+  // ---------- 날짜 선택 ----------
   const renderDateSelection = () => {
     const availableDates = getAvailableDates();
     const now = new Date();
 
-    // 오늘 00:00, 오늘 08:00 기준 시각 계산
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
@@ -1108,10 +1113,8 @@ function Reserve() {
             dateStart.setHours(0, 0, 0, 0);
 
             const isPastDate = dateStart < todayStart; // 지난 날짜
-            const isToday = dateStart.getTime() === todayStart.getTime();
             const isDisabledDate = isPastDate;
 
-            // 안내 문구 (선택)
             const disabledReason = isPastDate
               ? "예약 가능 기간이 아닙니다"
               : "";
@@ -1170,15 +1173,13 @@ function Reserve() {
     );
   };
 
-  // 변경: renderTimeSelection (예약됨/방 상태 판단 제거, 클릭 시 step=3로)
-  // 2) 시간 선택
+  // ---------- 시간 선택 ----------
   const renderTimeSelection = () => {
     const now = new Date();
     const isTodaySelected =
       selectedDate &&
       formatDateToYYYYMMDD(selectedDate) === formatDateToYYYYMMDD(now);
 
-    // ✅ admin이면 시간 제약 무시
     const role = user?.role || "student";
     const isAdmin = role === "admin";
 
@@ -1203,7 +1204,6 @@ function Reserve() {
             slotTime.setHours(slot.hour, slot.minute, 0, 0);
 
             const isDisabledByTime = isTodaySelected && slotTime <= now;
-            // ✅ admin이면 지난 시간도 선택 가능
             const finalDisabled = isDisabledByTime && !isAdmin;
 
             return (
@@ -1255,7 +1255,7 @@ function Reserve() {
     );
   };
 
-  // 보조 스타일/유틸 (파일 상단 근처에 추가)
+  // 보조 스타일/유틸
   const stepBoxStyle = (active) => ({
     padding: "0.5rem 1rem",
     backgroundColor: active ? "var(--primary-color)" : "var(--border-color)",
@@ -1397,22 +1397,18 @@ function Reserve() {
           renderRoomSelection()}
         {step > 1 && (
           <button
-            // 변경: 이전 단계 버튼 로직
             onClick={() => {
               resetError();
               if (step === 2) {
-                // 시간 선택으로 가기 전
                 setSelectedTime(null);
                 setSelectedFloor(null);
                 setSelectedRoom(null);
                 setStep(1);
               } else if (step === 3) {
-                // 층 선택으로 가기 전
                 setSelectedFloor(null);
                 setSelectedRoom(null);
                 setStep(2);
               } else if (step === 4) {
-                // 장소 선택으로 가기 전
                 setSelectedRoom(null);
                 setStep(3);
               }
@@ -1436,14 +1432,14 @@ function Reserve() {
       {isMapModalOpen && (
         <div
           style={modalOverlayStyle}
-          onClick={() => setIsMapModalOpen(false)} // 오버레이 클릭 시 닫기
+          onClick={() => setIsMapModalOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="건물 지도"
         >
           <div
             style={modalContentStyle}
-            onClick={(e) => e.stopPropagation()} // 콘텐츠 클릭은 이벤트 전파 막기
+            onClick={(e) => e.stopPropagation()}
             role="document"
           >
             <button
@@ -1485,9 +1481,8 @@ const modalOverlayStyle = {
   justifyContent: "center",
   alignItems: "center",
   zIndex: 1000,
-  // ✨ 추가
-  overscrollBehavior: "contain", // 바운스 방지
-  touchAction: "none", // 터치 제스처 비활성화
+  overscrollBehavior: "contain",
+  touchAction: "none",
 };
 
 const modalContentStyle = {
@@ -1501,7 +1496,6 @@ const modalContentStyle = {
   width: "auto",
   zIndex: 1001,
   position: "relative",
-  // 내부 스크롤은 허용 (이미 overflow:auto)
   WebkitOverflowScrolling: "touch",
 };
 
