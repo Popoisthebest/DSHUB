@@ -97,6 +97,50 @@ function Home() {
         ⚠️ 이 사이트는 <strong>가로 화면</strong> 사용을 권장합니다.
       </div>
 
+      {/* 공지사항 섹션 */}
+      <div
+        style={{
+          backgroundColor: "white",
+          padding: "2rem",
+          borderRadius: "8px",
+          boxShadow: "var(--shadow)",
+          marginBottom: "2rem",
+        }}
+      >
+        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
+          공지사항
+        </h2>
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {notices.length > 0 ? (
+            notices.map((notice) => (
+              <div
+                key={notice.id}
+                style={{
+                  padding: "1rem",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 0.5rem 0" }}>{notice.title}</h3>
+                <p style={{ margin: "0", color: "var(--text-color-light)" }}>
+                  {notice.content}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "1rem",
+                color: "var(--text-color-light)",
+              }}
+            >
+              공지사항이 없습니다.
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 이용 안내 섹션 */}
       <div
         style={{
@@ -153,50 +197,6 @@ function Home() {
               예약 관련 문의사항은 관리자에게 연락해주세요.
             </p>
           </div>
-        </div>
-      </div>
-
-      {/* 공지사항 섹션 */}
-      <div
-        style={{
-          backgroundColor: "white",
-          padding: "2rem",
-          borderRadius: "8px",
-          boxShadow: "var(--shadow)",
-          marginBottom: "2rem",
-        }}
-      >
-        <h2 style={{ marginBottom: "1.5rem", color: "var(--primary-color)" }}>
-          공지사항
-        </h2>
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {notices.length > 0 ? (
-            notices.map((notice) => (
-              <div
-                key={notice.id}
-                style={{
-                  padding: "1rem",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "4px",
-                }}
-              >
-                <h3 style={{ margin: "0 0 0.5rem 0" }}>{notice.title}</h3>
-                <p style={{ margin: "0", color: "var(--text-color-light)" }}>
-                  {notice.content}
-                </p>
-              </div>
-            ))
-          ) : (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "1rem",
-                color: "var(--text-color-light)",
-              }}
-            >
-              공지사항이 없습니다.
-            </div>
-          )}
         </div>
       </div>
 
