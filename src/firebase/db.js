@@ -21,7 +21,7 @@ import { db } from "./config";
 export const saveReservationMembers = async (
   reservationId,
   owner, // { studentId, name }
-  participants = [] // [{ studentId, name }, ...]
+  participants = [], // [{ studentId, name }, ...]
 ) => {
   if (!reservationId) throw new Error("reservationId가 없습니다.");
 
@@ -99,14 +99,14 @@ export const deleteReservation = async (reservationId) => {
 export const listenToAllReservations = (
   callback,
   startOfWeekStr,
-  endOfWeekStr
+  endOfWeekStr,
 ) => {
   let q = query(
     collection(db, "reservations"),
     where("date", ">=", startOfWeekStr),
     where("date", "<=", endOfWeekStr),
     orderBy("date", "asc"), // 날짜 기준 오름차순 정렬
-    orderBy("time", "asc") // 시간 기준 오름차순 정렬
+    orderBy("time", "asc"), // 시간 기준 오름차순 정렬
   );
 
   const unsubscribe = onSnapshot(
@@ -121,7 +121,7 @@ export const listenToAllReservations = (
     (error) => {
       console.error("Error listening to all reservations:", error);
       // 에러 처리 로직 추가 가능
-    }
+    },
   );
 
   return unsubscribe;
@@ -132,7 +132,7 @@ export const listenToUserReservations = (callback, userId) => {
   const q = query(
     collection(db, "reservations"),
     where("studentId", "==", userId),
-    orderBy("createdAt", "desc")
+    orderBy("createdAt", "desc"),
   );
 
   const unsubscribe = onSnapshot(
@@ -146,7 +146,7 @@ export const listenToUserReservations = (callback, userId) => {
     },
     (error) => {
       console.error("Error listening to user reservations:", error);
-    }
+    },
   );
 
   return unsubscribe;
@@ -156,13 +156,13 @@ export const listenToUserReservations = (callback, userId) => {
 export const getReservationsByDate = async (
   date,
   roomName = null,
-  timeId = null
+  timeId = null,
 ) => {
   try {
     let q = query(
       collection(db, "reservations"),
       where("date", "==", date),
-      orderBy("time", "asc")
+      orderBy("time", "asc"),
     );
 
     if (roomName) {
@@ -206,7 +206,7 @@ export const getAllReservations = async (startDate, endDate) => {
     const q = query(
       reservationsRef,
       where("date", ">=", startDate),
-      where("date", "<=", endDate)
+      where("date", "<=", endDate),
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((doc) => ({
@@ -226,7 +226,7 @@ export const getUserReservations = async (studentId) => {
     const q = query(
       reservationsRef,
       where("studentId", "==", studentId),
-      where("status", "==", "active")
+      where("status", "==", "active"),
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((doc) => ({
@@ -243,13 +243,13 @@ export const getUserReservations = async (studentId) => {
 export const getReservationsByDateV2 = async (
   date,
   roomId = null,
-  timeId = null
+  timeId = null,
 ) => {
   try {
     let q = query(
       collection(db, "reservations"),
       where("date", "==", date),
-      orderBy("time", "asc")
+      orderBy("time", "asc"),
     );
 
     if (roomId) {
@@ -334,7 +334,7 @@ export const createUserProfile = async (uid, { studentId, name, role }) => {
         role: role ?? "student", // 역할 저장 (기본: student)
         createdAt: new Date(),
       },
-      { merge: true } // 기존 문서가 있으면 병합
+      { merge: true }, // 기존 문서가 있으면 병합
     );
   } catch (error) {
     throw error;
@@ -388,7 +388,7 @@ export const getInquiries = async (studentId) => {
     const q = query(
       inquiriesRef,
       where("studentId", "==", studentId),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const querySnapshot = await getDocs(q);
@@ -409,7 +409,7 @@ export const listenToPlaces = (callback) => {
     orderBy("wing"),
     orderBy("floor"),
     orderBy("order"), // 정렬 기준(옵션)
-    orderBy("name") // 동일 order에서 안정정렬
+    orderBy("name"), // 동일 order에서 안정정렬
   );
   return onSnapshot(q, (snap) => {
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -424,7 +424,7 @@ export const getPlaces = async () => {
     orderBy("wing"),
     orderBy("floor"),
     orderBy("order"),
-    orderBy("name")
+    orderBy("name"),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -441,7 +441,7 @@ export const upsertPlace = async (place) => {
       ...place,
       updatedAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 };
 
