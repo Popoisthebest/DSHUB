@@ -5,12 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { getAllNotices } from "../firebase/db";
 import "../styles/common.css";
 
-const NOTICE_PREVIEW_LENGTH = 140;
-
 function Home() {
   const navigate = useNavigate();
   const [notices, setNotices] = useState([]);
-  const [expandedNotices, setExpandedNotices] = useState({});
 
   useEffect(() => {
     const fetchNotices = async () => {
@@ -23,20 +20,6 @@ function Home() {
     };
     fetchNotices();
   }, []);
-
-  const toggleExpanded = (noticeId) => {
-    setExpandedNotices((prev) => ({
-      ...prev,
-      [noticeId]: !prev[noticeId],
-    }));
-  };
-
-  const getPreviewContent = (content = "") => {
-    if (content.length <= NOTICE_PREVIEW_LENGTH) return content;
-    return `${content.slice(0, NOTICE_PREVIEW_LENGTH)}...`;
-  };
-
-  const isLongNotice = (content = "") => content.length > NOTICE_PREVIEW_LENGTH;
 
   const markdownComponents = {
     p: ({ children }) => (
@@ -122,7 +105,6 @@ function Home() {
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
-      {/* 메인 섹션 */}
       <div
         style={{
           textAlign: "center",
@@ -182,7 +164,6 @@ function Home() {
         </div>
       </div>
 
-      {/* 경고 박스 */}
       <div
         style={{
           backgroundColor: "#fff3cd",
@@ -197,7 +178,6 @@ function Home() {
         ⚠️ 이 사이트는 <strong>가로 화면</strong> 사용을 권장합니다.
       </div>
 
-      {/* 공지사항 섹션 */}
       <div
         style={{
           backgroundColor: "white",
@@ -212,55 +192,27 @@ function Home() {
         </h2>
         <div style={{ display: "grid", gap: "1rem" }}>
           {notices.length > 0 ? (
-            notices.map((notice) => {
-              const expanded = !!expandedNotices[notice.id];
-              const longNotice = isLongNotice(notice.content);
-              const visibleContent =
-                longNotice && !expanded
-                  ? getPreviewContent(notice.content)
-                  : notice.content;
+            notices.map((notice) => (
+              <div
+                key={notice.id}
+                style={{
+                  padding: "1rem",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 0.75rem 0" }}>{notice.title}</h3>
 
-              return (
-                <div
-                  key={notice.id}
-                  style={{
-                    padding: "1rem",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "4px",
-                  }}
-                >
-                  <h3 style={{ margin: "0 0 0.75rem 0" }}>{notice.title}</h3>
-
-                  <div style={{ color: "var(--text-color-light)" }}>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={markdownComponents}
-                    >
-                      {visibleContent}
-                    </ReactMarkdown>
-                  </div>
-
-                  {longNotice && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(notice.id)}
-                      style={{
-                        marginTop: "0.25rem",
-                        padding: "0.45rem 0.8rem",
-                        backgroundColor: "#f1f3f5",
-                        color: "#333",
-                        border: "1px solid #ddd",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      {expanded ? "접기" : "자세히 보기"}
-                    </button>
-                  )}
+                <div style={{ color: "var(--text-color-light)" }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                  >
+                    {notice.content || ""}
+                  </ReactMarkdown>
                 </div>
-              );
-            })
+              </div>
+            ))
           ) : (
             <div
               style={{
@@ -275,7 +227,6 @@ function Home() {
         </div>
       </div>
 
-      {/* 이용 안내 섹션 */}
       <div
         style={{
           backgroundColor: "white",
@@ -334,7 +285,6 @@ function Home() {
         </div>
       </div>
 
-      {/* 기능 설명 섹션 */}
       <div
         style={{
           backgroundColor: "white",
