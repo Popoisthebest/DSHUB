@@ -1,12 +1,16 @@
-// Home.js
 import React, { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useNavigate } from "react-router-dom";
 import { getAllNotices } from "../firebase/db";
 import "../styles/common.css";
 
+const NOTICE_PREVIEW_LENGTH = 140;
+
 function Home() {
   const navigate = useNavigate();
   const [notices, setNotices] = useState([]);
+  const [expandedNotices, setExpandedNotices] = useState({});
 
   useEffect(() => {
     const fetchNotices = async () => {
@@ -19,6 +23,102 @@ function Home() {
     };
     fetchNotices();
   }, []);
+
+  const toggleExpanded = (noticeId) => {
+    setExpandedNotices((prev) => ({
+      ...prev,
+      [noticeId]: !prev[noticeId],
+    }));
+  };
+
+  const getPreviewContent = (content = "") => {
+    if (content.length <= NOTICE_PREVIEW_LENGTH) return content;
+    return `${content.slice(0, NOTICE_PREVIEW_LENGTH)}...`;
+  };
+
+  const isLongNotice = (content = "") => content.length > NOTICE_PREVIEW_LENGTH;
+
+  const markdownComponents = {
+    p: ({ children }) => (
+      <p style={{ margin: "0 0 0.6rem 0", lineHeight: 1.65 }}>{children}</p>
+    ),
+    ul: ({ children }) => (
+      <ul style={{ margin: "0 0 0.6rem 1.2rem", lineHeight: 1.65 }}>
+        {children}
+      </ul>
+    ),
+    ol: ({ children }) => (
+      <ol style={{ margin: "0 0 0.6rem 1.2rem", lineHeight: 1.65 }}>
+        {children}
+      </ol>
+    ),
+    li: ({ children }) => (
+      <li style={{ marginBottom: "0.2rem" }}>{children}</li>
+    ),
+    h1: ({ children }) => (
+      <h1 style={{ margin: "0 0 0.6rem 0", fontSize: "1.25rem" }}>
+        {children}
+      </h1>
+    ),
+    h2: ({ children }) => (
+      <h2 style={{ margin: "0 0 0.6rem 0", fontSize: "1.15rem" }}>
+        {children}
+      </h2>
+    ),
+    h3: ({ children }) => (
+      <h3 style={{ margin: "0 0 0.6rem 0", fontSize: "1.05rem" }}>
+        {children}
+      </h3>
+    ),
+    blockquote: ({ children }) => (
+      <blockquote
+        style={{
+          margin: "0 0 0.6rem 0",
+          padding: "0.6rem 0.9rem",
+          borderLeft: "4px solid #ccc",
+          backgroundColor: "#f8f9fa",
+          color: "#555",
+        }}
+      >
+        {children}
+      </blockquote>
+    ),
+    code: ({ inline, children }) =>
+      inline ? (
+        <code
+          style={{
+            backgroundColor: "#f1f3f5",
+            padding: "0.12rem 0.3rem",
+            borderRadius: "4px",
+            fontSize: "0.9em",
+          }}
+        >
+          {children}
+        </code>
+      ) : (
+        <pre
+          style={{
+            backgroundColor: "#f8f9fa",
+            padding: "0.9rem",
+            borderRadius: "8px",
+            overflowX: "auto",
+            marginBottom: "0.6rem",
+          }}
+        >
+          <code>{children}</code>
+        </pre>
+      ),
+    a: ({ href, children }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        style={{ color: "var(--primary-color)" }}
+      >
+        {children}
+      </a>
+    ),
+  };
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
@@ -112,21 +212,55 @@ function Home() {
         </h2>
         <div style={{ display: "grid", gap: "1rem" }}>
           {notices.length > 0 ? (
-            notices.map((notice) => (
-              <div
-                key={notice.id}
-                style={{
-                  padding: "1rem",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "4px",
-                }}
-              >
-                <h3 style={{ margin: "0 0 0.5rem 0" }}>{notice.title}</h3>
-                <p style={{ margin: "0", color: "var(--text-color-light)" }}>
-                  {notice.content}
-                </p>
-              </div>
-            ))
+            notices.map((notice) => {
+              const expanded = !!expandedNotices[notice.id];
+              const longNotice = isLongNotice(notice.content);
+              const visibleContent =
+                longNotice && !expanded
+                  ? getPreviewContent(notice.content)
+                  : notice.content;
+
+              return (
+                <div
+                  key={notice.id}
+                  style={{
+                    padding: "1rem",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <h3 style={{ margin: "0 0 0.75rem 0" }}>{notice.title}</h3>
+
+                  <div style={{ color: "var(--text-color-light)" }}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={markdownComponents}
+                    >
+                      {visibleContent}
+                    </ReactMarkdown>
+                  </div>
+
+                  {longNotice && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(notice.id)}
+                      style={{
+                        marginTop: "0.25rem",
+                        padding: "0.45rem 0.8rem",
+                        backgroundColor: "#f1f3f5",
+                        color: "#333",
+                        border: "1px solid #ddd",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      {expanded ? "접기" : "자세히 보기"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
           ) : (
             <div
               style={{
@@ -219,7 +353,6 @@ function Home() {
             gap: "2rem",
           }}
         >
-          {/* 실시간 예약 카드 (클릭 시 /reserve 이동) */}
           <div
             onClick={() => navigate("/reserve")}
             role="button"
@@ -252,7 +385,6 @@ function Home() {
             <div style={{ marginTop: "1rem", fontSize: "2rem" }}>🕒</div>
           </div>
 
-          {/* 예약 관리 카드 (클릭 시 /reservations 이동) */}
           <div
             onClick={() => navigate("/reservations")}
             role="button"
